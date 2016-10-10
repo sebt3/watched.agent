@@ -6,7 +6,6 @@
 #include <sys/stat.h>
 #include <dlfcn.h>
 #include <unistd.h> 
-#include <pistache/http_headers.h>
 
 using namespace std;
 using namespace watcheD;

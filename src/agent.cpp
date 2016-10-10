@@ -1,4 +1,5 @@
 #include "collectors.h"
+#include <fstream>
 using namespace watcheD;
 
 #include <boost/filesystem.hpp>
