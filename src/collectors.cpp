@@ -284,6 +284,7 @@ CollectorsManager::CollectorsManager(HttpServer* p_server, Config* p_cfg) : serv
 	class stat st;
 	void *dlib;
 
+			std::cout << "Loading from " << directory << "\n";
 	dir = opendir(directory.c_str());
 	while ((ent = readdir(dir)) != NULL) {
 		const string file_name = ent->d_name;
@@ -296,6 +297,7 @@ CollectorsManager::CollectorsManager(HttpServer* p_server, Config* p_cfg) : serv
 			continue;
 
 		if (file_name.substr(file_name.rfind(".")) == ".so") {
+			std::cout << "Loading " << file_name << "\n";
 			dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
 			if(dlib == NULL){
 				cerr << dlerror() << endl; 

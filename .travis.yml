@@ -1,0 +1,36 @@
+language: cpp
+os: linux
+sudo: required
+dist: trusty
+
+compiler:
+  - gcc
+  - clang
+    
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - clang
+    - libboost1.55-all-dev
+    - libmysql++-dev
+    - libssl-dev
+    - cmake
+
+before_script:
+    - sudo apt-get install -y libboost1.55-all-dev libmysql++-dev libssl-dev cmake
+    - ./tools/travis/installdeps.sh
+
+script:
+    - $CXX --version
+    - mkdir build && cd build
+    - cmake ..
+    - make
+
+notifications:
+   email:
+     recipients:
+       - sebastien.huss@gmail.com
+     on_success: change
+     on_failure: always
