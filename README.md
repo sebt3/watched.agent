@@ -3,6 +3,7 @@
 Watched aim to become a performance analysis and a monitoring tool.
 This is the plugin-based agent written in c++. It provide a REST api to the data that the backend consume.
 
+![Status](https://travis-ci.org/sebt3/watched.front.svg?branch=master)
 ## Dependencies
 This project is based on the following projects :
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp)
