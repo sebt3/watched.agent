@@ -1,0 +1,13 @@
+[Unit]
+Description=Watched agent
+After=network.target
+
+[Service]
+ExecStart=@CMAKE_INSTALL_PREFIX@/sbin/watched.agent
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+Alias=watched.agent.service

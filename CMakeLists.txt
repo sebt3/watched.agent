@@ -2,6 +2,31 @@ cmake_minimum_required (VERSION 2.8.7)
 project (watched.agent)
 
 ####
+## Forbid in-tree building
+#
+if(${CMAKE_SOURCE_DIR} MATCHES ${CMAKE_BINARY_DIR})
+	message(STATUS "Please do an out-of-tree build:")
+	message(STATUS "rm -f CMakeCache.txt && mkdir build && cd build; cmake .. && make")
+	message(FATAL_ERROR "In-tree-build detected!")
+endif(${CMAKE_SOURCE_DIR} MATCHES ${CMAKE_BINARY_DIR})
+
+
+####
+## Default installation path 
+#
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+	set(CMAKE_INSTALL_PREFIX
+		"/usr" CACHE PATH "Default install prefix" FORCE)
+endif(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+
+# Special case for /etc and /var when prefix is /usr
+if(${CMAKE_INSTALL_PREFIX} STREQUAL "/usr")
+	set(CMAKE_INSTALL_SYSCONFDIR "/etc" CACHE PATH "read-only single-machine data (etc)")
+	set(CMAKE_INSTALL_LOCALSTATEDIR "/var" CACHE PATH "modifiable single-machine data (var)")
+endif(${CMAKE_INSTALL_PREFIX} STREQUAL "/usr")
+include(GNUInstallDirs)
+
+####
 ## C++11 Compiler 
 #
 include(CheckCXXCompilerFlag)
@@ -27,10 +52,12 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 ## Dependencies
 #
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Boost 1.53.0 COMPONENTS regex system thread filesystem date_time REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Jsoncpp REQUIRED)
+include(${CMAKE_SOURCE_DIR}/cmake/Modules/systemdservice.cmake)
 include_directories(SYSTEM ${JSONCPP_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})
 
 ####
@@ -40,16 +67,31 @@ file (GLOB	      HEADER_FILES "include/*.h")
 file (GLOB      AGENT_SOURCE_FILES "src/*.cpp")
 file (GLOB COLLECTORS_SOURCE_FILES "collectors/*.cpp" )
 
-include_directories (${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/sws)
+include_directories (${CMAKE_CURRENT_SOURCE_DIR}/sws ${CMAKE_CURRENT_SOURCE_DIR}/include)
 install(FILES ${HEADER_FILES} DESTINATION include/watched)
+configure_file ("${PROJECT_SOURCE_DIR}/include/config.h.in"
+                "${PROJECT_BINARY_DIR}/include/config.h" )
+configure_file ("${PROJECT_SOURCE_DIR}/tools/conf/agent.config.json.in"
+                "${PROJECT_BINARY_DIR}/agent.config.json" )
+include_directories(${PROJECT_BINARY_DIR}/include)
 
+if (SYSTEMD_FOUND)
+	configure_file(
+		"${PROJECT_SOURCE_DIR}/tools/systemd/watched.agent.service.in"
+		"${PROJECT_BINARY_DIR}/tools/systemd/watched.agent.service"
+		@ONLY)
+	install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tools/systemd/watched.agent.service"
+		DESTINATION "${SYSTEMD_SERVICES_INSTALL_DIR}")
+endif (SYSTEMD_FOUND)
 ####
 ## Targets
 #
-set( AGT_SOURCE_FILES ${AGENT_SOURCE_FILES} )
-add_executable(watched.agent ${AGT_SOURCE_FILES})
+set( AGT_SOURCE_FILES ${AGENT_SOURCE_FILES} agent.config.json)
+add_executable(watched.agent ${AGT_SOURCE_FILES} ${PROJECT_BINARY_DIR}/agent.config.json)
 target_link_libraries(watched.agent dl ${JSONCPP_LIBRARIES} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
-install(TARGETS watched.agent DESTINATION sbin)
+install(TARGETS watched.agent DESTINATION sbin COMPONENT binaries)
+install(FILES ${PROJECT_BINARY_DIR}/agent.config.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched COMPONENT config)
+
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins)
 foreach( collector_cpp ${COLLECTORS_SOURCE_FILES} )

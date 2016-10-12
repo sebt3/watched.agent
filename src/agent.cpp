@@ -8,7 +8,6 @@ using namespace watcheD;
 const std::string SERVER_HEAD="watched.agent/0.1";
 const std::string APPS_NAME="watched.agent";
 const std::string APPS_DESC="Watch over wasted being washed up";
-#define CFG_FILE "agent.config.json"
 
 void default_resource_send(const HttpServer &server, std::shared_ptr<HttpServer::Response> response,
                            std::shared_ptr<std::ifstream> ifs, std::shared_ptr<std::vector<char> > buffer) {
@@ -27,7 +26,7 @@ void default_resource_send(const HttpServer &server, std::shared_ptr<HttpServer:
 }
 
 int main(int argc, char *argv[]) {
-	Config cfg(CFG_FILE);
+	Config cfg(WATCHED_CONFIG);
 	Json::Value*	servCfg = cfg.getServer();
 	int port_i	= (*servCfg)["port"].asInt();
 	if (argc>1)	port_i = atoi(argv[1]);

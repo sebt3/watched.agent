@@ -12,6 +12,7 @@
 typedef SimpleWeb::Server<SimpleWeb::HTTP> HttpServer;
 typedef SimpleWeb::Client<SimpleWeb::HTTP> HttpClient;
 
+#include "config.h"
 
 namespace watcheD {
 /*********************************

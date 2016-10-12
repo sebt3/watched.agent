@@ -1,0 +1,2 @@
+#pragma once
+const std::string WATCHED_CONFIG="@CMAKE_INSTALL_SYSCONFDIR@/watched/agent.config.json";
