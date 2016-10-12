@@ -1,7 +1,7 @@
 # watched.agent
 [![Status](https://travis-ci.org/sebt3/watched.agent.svg?branch=master)](https://travis-ci.org/sebt3/watched.agent)
 ## Overview
-Watched aim to become a performance analysis and a monitoring tool.
+[Watched](https://sebt3.github.io/watched/) aim to become a performance analysis and a monitoring tool.
 This is the plugin-based agent written in c++. It provide a REST api to the data that the backend consume.
 
 ## Dependencies

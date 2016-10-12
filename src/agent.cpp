@@ -1,4 +1,4 @@
-#include "collectors.h"
+#include "agent.h"
 #include <fstream>
 using namespace watcheD;
 
@@ -8,6 +8,8 @@ using namespace watcheD;
 const std::string SERVER_HEAD="watched.agent/0.1";
 const std::string APPS_NAME="watched.agent";
 const std::string APPS_DESC="Watch over wasted being washed up";
+#include "config.h"
+
 
 void default_resource_send(const HttpServer &server, std::shared_ptr<HttpServer::Response> response,
                            std::shared_ptr<std::ifstream> ifs, std::shared_ptr<std::vector<char> > buffer) {

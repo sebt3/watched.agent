@@ -1,0 +1,13 @@
+Source: watched.agent
+Maintainer: Sébastien Huss <sebastien.huss@gmail.com>
+Section: misc
+Priority: optional
+Standards-Version: 3.9.2
+Build-Depends: debhelper (>= 9)
+
+Package: watched.agent
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: watch over your system
+ Collect performance metrics
+ Monitor key system ressources

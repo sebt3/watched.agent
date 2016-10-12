@@ -1,14 +1,16 @@
 #pragma once
 
-#include "common.h"
-
-extern const std::string SERVER_HEAD;
-extern const std::string APPS_NAME;
-extern const std::string APPS_DESC;
-
-
+#include <json/json.h>
+#include <map>
+#include <string>
+#include <thread>
+#include "server_http.hpp"
+#include "client_http.hpp"
+typedef SimpleWeb::Server<SimpleWeb::HTTP> HttpServer;
+typedef SimpleWeb::Client<SimpleWeb::HTTP> HttpClient;
 
 namespace watcheD {
+
 /*********************************
  * Ressource
  */
@@ -83,22 +85,10 @@ private:
 
 
 /*********************************
- * CollectorsManager
+ * Plugin management
  */
 typedef Collector *collector_maker_t(HttpServer* p_srv, Json::Value* p_cfg);
 extern std::map<std::string, collector_maker_t *> factory;
-
-class CollectorsManager {
-public:
-	CollectorsManager(HttpServer *p_server, Config* p_cfg);
-	~CollectorsManager();
-	void startThreads();
-	void doGetJson(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request);
-	void doGetRootPage(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request);
-	HttpServer* server;
-	Config *cfg;
-	std::map<std::string, Collector*>	collectors;
-}; 
 
 }
 
@@ -116,23 +106,3 @@ class proxy { public:						\
 proxy p;
 
 
-/*********************************
- * Access-Control-Allow-Origin
- *
-
-class acao : public Net::Http::Header::Header {
-public:
-	static constexpr uint64_t Hash = Net::Http::Header::detail::hash("Access-Control-Allow-Origin");
-	uint64_t hash() const { return Hash; }
-
-	static constexpr const char *Name = "Access-Control-Allow-Origin";
-	const char *name() const { return Name; }
-
-	acao() : allow_("*") { } 
-	acao(std::string value) : allow_(value) { }
-	void parse(const std::string& str) { }
-	void write(std::ostream& os) const { os << allow_; }
-	
-private:
-	std::string allow_;
-};*/

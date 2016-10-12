@@ -1,4 +1,4 @@
-#include "common.h"
+#include "agent.h"
 
 #include <list>
 #include <fstream>
@@ -57,52 +57,4 @@ Json::Value* 	Config::getAgent() {
 		data["agent"].setComment(std::string("/*\tRemote agent specific configuration */"), Json::commentBefore);
 	}
 	return &(data["agent"]); 
-}
-
-Json::Value* 	Config::getAggregate() { 
-	Json::Value obj_value(Json::objectValue);
-	if(! data.isMember("aggregate")) {
-		data["aggregate"] = obj_value;
-		data["aggregate"].setComment(std::string("/*\tConfigure the data aggregate process */"), Json::commentBefore);
-	}
-	return &(data["aggregate"]); 
-}
-
-Json::Value* 	Config::getCentral() {
-	Json::Value obj_value(Json::objectValue);
-	if(! data.isMember("central")) {
-		data["central"] = obj_value;
-		data["central"].setComment(std::string("/*\tCentral server speccific configuration */"), Json::commentBefore);
-	}
-	return &(data["central"]);
-}
-
-Json::Value* 	Config::getDB() {
-	Json::Value obj_value(Json::objectValue);
-	if(! data.isMember("db")) {
-		data["db"] = obj_value;
-		data["db"].setComment(std::string("/*\tMySQL database informations */"), Json::commentBefore);
-	}
-	if (!data["db"].isMember("connection_string")) {
-		data["db"]["connection_string"]	= "localhost:3306";
-		data["db"]["connection_string"].setComment(std::string("/*\tMySQL database connection string */"), Json::commentAfterOnSameLine);
-	}
-	if (!data["db"].isMember("database_name")) {
-		data["db"]["database_name"]		= "sebtest";
-		data["db"]["database_name"].setComment(std::string("/*\t\tMySQL database name */"), Json::commentAfterOnSameLine);
-	}
-	if (!data["db"].isMember("login")) {
-		data["db"]["login"]			= "seb";
-		data["db"]["login"].setComment(std::string("/*\t\t\tMySQL login */"), Json::commentAfterOnSameLine);
-	}
-	if (!data["db"].isMember("password")) {
-		data["db"]["password"]		= "seb";
-		data["db"]["password"].setComment(std::string("/*\t\t\tMySQL password */"), Json::commentAfterOnSameLine);
-	}
-	if (!data["db"].isMember("pool_size")) {
-		data["db"]["pool_size"]		= 32;
-		data["db"]["pool_size"].setComment(std::string("/*\t\t\tNumber of concurrent connections to the database */"), Json::commentAfterOnSameLine);
-	}
-
-	return &(data["db"]);
 }
