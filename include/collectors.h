@@ -76,9 +76,9 @@ protected:
 	Json::Value* cfg;
 	std::string morrisType;
 	std::string morrisOpts;
+	std::string name;
 private:
 	bool active;
-	std::string name;
 	std::thread my_thread;
 	HttpServer* server;
 };

@@ -28,10 +28,11 @@ void default_resource_send(const HttpServer &server, std::shared_ptr<HttpServer:
 }
 
 int main(int argc, char *argv[]) {
-	Config cfg(WATCHED_CONFIG);
+	std::string cfgfile = WATCHED_CONFIG;
+	if (argc>1) cfgfile = argv[1];
+	Config cfg(cfgfile);
 	Json::Value*	servCfg = cfg.getServer();
 	int port_i	= (*servCfg)["port"].asInt();
-	if (argc>1)	port_i = atoi(argv[1]);
 
 	HttpServer server(port_i, 1);
 	server.config.address  = (*servCfg)["host"].asString();
@@ -77,7 +78,7 @@ int main(int argc, char *argv[]) {
 	CollectorsManager cm(&server,&cfg);
 	cfg.save();
 	cm.startThreads();
-
+	
 	server.start();
 
 	return 0;

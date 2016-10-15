@@ -1,6 +1,7 @@
 {
 	"server" : 
 	{
-		"collectors_dir" : "@CMAKE_INSTALL_PREFIX@/lib/watched/collectors.cpp"
+		"collectors_cpp" : "@CMAKE_INSTALL_PREFIX@/lib/watched/collectors.cpp",
+		"collectors_lua" : "@CMAKE_INSTALL_PREFIX@/lib/watched/collectors.lua"
 	}
 }

@@ -83,12 +83,12 @@ void Ressource::getDefinition(Json::Value* p_defs) {
  * Collector
  */
 
-Collector::Collector(string p_name, HttpServer* p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), active(false), name(p_name), server(p_server) {
-	if(! cfg->isMember("history")) {
+Collector::Collector(string p_name, HttpServer* p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), active(false),  server(p_server) {
+	if(! cfg->isMember("history") && p_history>0) {
 		(*cfg)["history"] = p_history;
 		(*cfg)["history"].setComment(std::string("/*\t\tNumber of elements to keep*/"), Json::commentAfterOnSameLine);
 	}
-	if(! cfg->isMember("poll-frequency")) {
+	if(! cfg->isMember("poll-frequency") && p_freq_pool>0) {
 		(*cfg)["poll-frequency"] = p_freq_pool;
 		(*cfg)["poll-frequency"].setComment(std::string("/* \tNumber of seconds between snapshots*/"), Json::commentAfterOnSameLine);
 	}
@@ -279,7 +279,7 @@ CollectorsManager::CollectorsManager(HttpServer* p_server, Config* p_cfg) : serv
 	// 1st : find and load the modules
 	map<string, collector_maker_t *, less<string> >::iterator factit;
 	DIR *dir;
-	const string directory = (*servCfg)["collectors_dir"].asString();
+	const string directory = (*servCfg)["collectors_cpp"].asString();
 	class dirent *ent;
 	class stat st;
 	void *dlib;
@@ -312,15 +312,38 @@ CollectorsManager::CollectorsManager(HttpServer* p_server, Config* p_cfg) : serv
 	for(factit = factory.begin();factit != factory.end(); factit++) {
 		collectors[factit->first]	= factit->second(server, cfg->getCollector(factit->first));
 	}
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
+	// Load the lua plugins
+	const string dirlua = (*servCfg)["collectors_lua"].asString();
+	dir = opendir(dirlua.c_str());
+	while ((ent = readdir(dir)) != NULL) {
+		const string file_name = ent->d_name;
+		const string name = file_name.substr(0,file_name.rfind("."));
+		const string full_file_name = dirlua + "/" + file_name;
+
+		if (file_name[0] == '.')
+			continue;
+		if (stat(full_file_name.c_str(), &st) == -1)
+			continue;
+		const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+		if (is_directory)
+			continue;
+
+
+		if (file_name.substr(file_name.rfind(".")) == ".lua") {
+			collectors[name] = new LuaCollector(server, cfg->getCollector(name), full_file_name);
+		}
+	}
+	closedir(dir);
+	
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	associate(server,"GET","^/$",doGetRootPage);
 	associate(server,"GET","^/api/swagger.json$",doGetJson);
 }
 
 void CollectorsManager::startThreads() {
-	for(map<string, collector_maker_t *, less<string> >::iterator factit = factory.begin();factit != factory.end(); factit++)
-		collectors[factit->first]->startThread();
+	for(std::map<std::string, Collector*>::iterator i = collectors.begin();i != collectors.end();i++)
+		i->second->startThread();
 }
 
 CollectorsManager::~CollectorsManager() {

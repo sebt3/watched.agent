@@ -57,8 +57,9 @@ find_package(Threads REQUIRED)
 find_package(Boost 1.53.0 COMPONENTS regex system thread filesystem date_time REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Jsoncpp REQUIRED)
+find_package(Lua REQUIRED)
 include(${CMAKE_SOURCE_DIR}/cmake/Modules/systemdservice.cmake)
-include_directories(SYSTEM ${JSONCPP_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})
+include_directories(SYSTEM ${JSONCPP_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${LUA_INCLUDE_DIR})
 
 ####
 ## Sources
@@ -66,9 +67,9 @@ include_directories(SYSTEM ${JSONCPP_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${OPENSSL
 file (GLOB	      HEADER_FILES "include/*.h")
 file (GLOB      AGENT_SOURCE_FILES "src/*.cpp")
 file (GLOB COLLECTORS_SOURCE_FILES "collectors/*.cpp" )
+file (GLOB    LUA_COLLECTORS_FILES "luaCollectors/*.lua" )
 
 include_directories (${CMAKE_CURRENT_SOURCE_DIR}/sws ${CMAKE_CURRENT_SOURCE_DIR}/include)
-install(FILES ${HEADER_FILES} DESTINATION include/watched)
 configure_file ("${PROJECT_SOURCE_DIR}/include/config.h.in"
                 "${PROJECT_BINARY_DIR}/include/config.h" )
 configure_file ("${PROJECT_SOURCE_DIR}/tools/conf/agent.config.json.in"
@@ -86,9 +87,9 @@ endif (SYSTEMD_FOUND)
 ####
 ## Targets
 #
-set( AGT_SOURCE_FILES ${AGENT_SOURCE_FILES} agent.config.json)
+set( AGT_SOURCE_FILES ${AGENT_SOURCE_FILES})
 add_executable(watched.agent ${AGT_SOURCE_FILES} ${PROJECT_BINARY_DIR}/agent.config.json)
-target_link_libraries(watched.agent dl ${JSONCPP_LIBRARIES} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(watched.agent dl ${JSONCPP_LIBRARIES} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${LUA_LIBRARIES})
 install(TARGETS watched.agent DESTINATION sbin COMPONENT binaries)
 install(FILES ${PROJECT_BINARY_DIR}/agent.config.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched COMPONENT config)
 
@@ -99,6 +100,11 @@ foreach( collector_cpp ${COLLECTORS_SOURCE_FILES} )
 	add_library( ${collector} SHARED ${collector_cpp} )
 	install(TARGETS ${collector} DESTINATION lib/watched/collectors.cpp)
 endforeach( collector_cpp ${COLLECTORS_SOURCE_FILES} )
+
+install(FILES "include/collectors.h" DESTINATION include/watched)
+foreach( collector_lua ${LUA_COLLECTORS_FILES} )
+	install(FILES ${collector_lua} DESTINATION lib/watched/collectors.lua)
+endforeach( collector_lua ${LUA_COLLECTORS_FILES} )
 
 
 ####

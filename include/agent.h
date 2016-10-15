@@ -1,5 +1,6 @@
 #pragma once
 #include "collectors.h"
+#include "selene.h"
 
 extern const std::string SERVER_HEAD;
 extern const std::string APPS_NAME;
@@ -35,6 +36,25 @@ public:
 	Config *cfg;
 	std::map<std::string, Collector*>	collectors;
 }; 
+
+/*********************************
+ * LuaCollector
+ */
+class LuaCollector : public Collector {
+public:
+	LuaCollector(HttpServer* p_srv, Json::Value* p_cfg, const std::string p_fname);
+
+	void collect();
+	void addRes(std::string p_name, std::string p_desc, std::string p_typeName);
+	void addProp(std::string p_res, std::string p_name, std::string p_desc, std::string p_type);
+	void nextVal(std::string p_res);
+	void setProp(std::string p_res, std::string p_name, int val);
+	void setPropD(std::string p_res, std::string p_name, double val);
+	std::string getName(){ return name; }
+	
+private:
+	sel::State state{true};
+};
 
 }
 
