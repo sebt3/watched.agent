@@ -221,7 +221,7 @@ void Collector::getIndexHtml(std::stringstream& stream ){
  */
 
 namespace watcheD {
-map<string, collector_maker_t *> factory;
+map<string, collector_maker_t *> collectorFactory;
 }
 
 
@@ -274,7 +274,7 @@ CollectorsManager::CollectorsManager(HttpServer* p_server, Config* p_cfg) : serv
 	closedir(dir);
 	
 	// Instanciate the plugins classes
-	for(factit = factory.begin();factit != factory.end(); factit++) {
+	for(factit = collectorFactory.begin();factit != collectorFactory.end(); factit++) {
 		collectors[factit->first]	= factit->second(server, cfg->getCollector(factit->first));
 	}
 

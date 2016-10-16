@@ -1,5 +1,5 @@
 #pragma once
-#include "agent.h"
+#include "collectors.h"
 #include <string>
 #include <vector>
 
@@ -59,7 +59,7 @@ private:
  */
 class service {
 public:
-	service() {}
+	service(HttpServer* p_server): name(""), type(""), cfg(NULL), server(p_server) {}
 	void	setSocket(socket *p_sock);
 	//socket *getSocket() {return sock; }
 	void 	addMainProcess(process *p_p);
@@ -67,55 +67,59 @@ public:
 	bool	havePID(uint32_t p_pid);
 	void	getIndexHtml(std::stringstream& stream );
 protected:
-	std::string name;
+	std::string		name;
+	std::string		type;
+	Json::Value*		cfg;
 private:
-	std::vector<socket *> sockets;
-	std::vector<process *> mainProcess;
-	//std::vector<process *> clientProcess;
+	HttpServer*		server;
+	std::vector<socket *>	sockets;
+	std::vector<process *>	mainProcess;
+	//std::vector<process *> subProcess;
 };
 
-/*********************************
- * ServicesManager
- */
-//TODO: add support for plugin detectors
-//TODO: add support for enhancers (being plugin or not)
-//TODO: plugins should be able to be written in lua
-class serviceDetector;
-class servicesManager {
-public:
-	servicesManager(HttpServer *p_server, Config* p_cfg);
-	void	find();
-	void	addService(service *p_serv);
-	bool	haveSocket(uint32_t p_socket_id);
-	bool	havePID(uint32_t p_pid);
-	void	doGetJson(response_ptr response, request_ptr request);
-	void	doGetRootPage(response_ptr response, request_ptr request);
-	void	startThreads();
-private:
-	std::vector<service *>		services;
-	std::vector<serviceDetector *>	detectors;
-	CollectorsManager*		systemCollectors;
-	HttpServer* server;
-	Config *cfg;
-};
 
 /*********************************
  * Detectors
  */
-
+class servicesManager;
 class serviceDetector {
 public:
-	serviceDetector(servicesManager *p_sm):services(p_sm) {}
+	serviceDetector(servicesManager *p_sm, HttpServer* p_server):server(p_server), services(p_sm) {}
 	virtual void find() =0;
 	
 protected:
-	servicesManager *services;
+	HttpServer*		server;
+	servicesManager*	services;
 };
 
-class socketDetector: public serviceDetector {
-public:
-	socketDetector(servicesManager *p_sm):serviceDetector(p_sm) {}
-	void find();
-};
+/*********************************
+ * Plugin management
+ */
+typedef service *service_maker_t(HttpServer* p_srv);
+extern std::map<std::string, service_maker_t *> serviceFactory;
+typedef serviceDetector *detector_maker_t(servicesManager *p_sm, HttpServer* p_server);
+extern std::map<std::string, detector_maker_t *> detectorFactory;
 
 }
+
+#define MAKE_PLUGIN_SERVICE(className,id)		\
+extern "C" {						\
+service *makeService(HttpServer* p_srv) {		\
+   return new className(p_srv);				\
+}							\
+}							\
+class proxyService { public:				\
+   proxyService(){ serviceFactory[id] = makeService; }	\
+};							\
+proxyService p;
+
+#define MAKE_PLUGIN_DETECTOR(className,id)				\
+extern "C" {								\
+serviceDetector *makeDetector(servicesManager *p_sm, HttpServer* p_server) {	\
+   return new className(p_sm, p_server);				\
+}									\
+}									\
+class proxyDetector { public:						\
+   proxyDetector(){ detectorFactory[id] = makeDetector; }		\
+};									\
+proxyDetector p;

@@ -1,5 +1,5 @@
 #pragma once
-#include "collectors.h"
+#include "services.h"
 #include "selene.h"
 
 extern const std::string SERVER_HEAD;
@@ -60,8 +60,43 @@ private:
 	sel::State state{true};
 };
 
-}
 
+/*********************************
+ * ServicesManager
+ */
+//TODO: add support for plugin detectors
+//TODO: add support for enhancers (being plugin or not)
+//TODO: plugins should be able to be written in lua
+
+class servicesManager {
+public:
+	servicesManager(HttpServer *p_server, Config* p_cfg);
+	void	find();
+	void	addService(service *p_serv);
+	bool	haveSocket(uint32_t p_socket_id);
+	bool	havePID(uint32_t p_pid);
+	void	doGetJson(response_ptr response, request_ptr request);
+	void	doGetRootPage(response_ptr response, request_ptr request);
+	void	startThreads();
+private:
+	std::vector<service *>		services;
+	std::vector<serviceDetector *>	detectors;
+	CollectorsManager*		systemCollectors;
+	HttpServer* server;
+	Config *cfg;
+};
+
+
+/*********************************
+ * SocketDetector
+ */
+class socketDetector: public serviceDetector {
+public:
+	socketDetector(servicesManager *p_sm, HttpServer* p_server):serviceDetector(p_sm, p_server) {}
+	void find();
+};
+
+}
 
 /*********************************
  * Access-Control-Allow-Origin for pistache

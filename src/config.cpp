@@ -28,8 +28,11 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 		data["server"]["port"] = 9080;
 		data["server"]["port"].setComment(std::string("/*\t\tTCP port number */"), Json::commentAfterOnSameLine);
 	}
+	if (! data["server"].isMember("services_cpp")) {
+		data["server"]["services_cpp"] = "services";
+	}
 	if (! data["server"].isMember("collectors_cpp")) {
-		data["server"]["collectors_cpp"] = "plugins";
+		data["server"]["collectors_cpp"] = "collectors";
 	}
 	if (! data["server"].isMember("collectors_lua")) {
 		data["server"]["collectors_lua"] = "../luaCollectors";

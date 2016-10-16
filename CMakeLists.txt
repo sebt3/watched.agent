@@ -67,6 +67,7 @@ include_directories(SYSTEM ${JSONCPP_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${OPENSSL
 file (GLOB	      HEADER_FILES "include/*.h")
 file (GLOB      AGENT_SOURCE_FILES "src/*.cpp")
 file (GLOB COLLECTORS_SOURCE_FILES "collectors/*.cpp" )
+file (GLOB   SERVICES_SOURCE_FILES "services/*.cpp" )
 file (GLOB    LUA_COLLECTORS_FILES "luaCollectors/*.lua" )
 
 include_directories (${CMAKE_CURRENT_SOURCE_DIR}/sws ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -94,14 +95,22 @@ install(TARGETS watched.agent DESTINATION sbin COMPONENT binaries)
 install(FILES ${PROJECT_BINARY_DIR}/agent.config.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched COMPONENT config)
 
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/collectors)
 foreach( collector_cpp ${COLLECTORS_SOURCE_FILES} )
 	get_filename_component( collector ${collector_cpp} NAME_WE )
 	add_library( ${collector} SHARED ${collector_cpp} )
 	install(TARGETS ${collector} DESTINATION lib/watched/collectors.cpp)
 endforeach( collector_cpp ${COLLECTORS_SOURCE_FILES} )
 
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/services)
+foreach( service_cpp ${SERVICES_SOURCE_FILES} )
+	get_filename_component( service ${service_cpp} NAME_WE )
+	add_library( ${service} SHARED ${service_cpp} )
+	install(TARGETS ${service} DESTINATION lib/watched/services.cpp)
+endforeach( service_cpp ${SERVICES_SOURCE_FILES} )
+
 install(FILES "include/collectors.h" DESTINATION include/watched)
+install(FILES "include/services.h" DESTINATION include/watched)
 foreach( collector_lua ${LUA_COLLECTORS_FILES} )
 	install(FILES ${collector_lua} DESTINATION lib/watched/collectors.lua)
 endforeach( collector_lua ${LUA_COLLECTORS_FILES} )

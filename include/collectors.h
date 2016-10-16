@@ -90,7 +90,7 @@ private:
  * Plugin management
  */
 typedef Collector *collector_maker_t(HttpServer* p_srv, Json::Value* p_cfg);
-extern std::map<std::string, collector_maker_t *> factory;
+extern std::map<std::string, collector_maker_t *> collectorFactory;
 
 }
 
@@ -103,7 +103,7 @@ Collector *maker(HttpServer* p_srv, Json::Value* p_cfg){	\
 }								\
 }								\
 class proxy { public:						\
-   proxy(){ factory[id] = maker; }				\
+   proxy(){ collectorFactory[id] = maker; }			\
 };								\
 proxy p;
 

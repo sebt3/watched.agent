@@ -1,4 +1,4 @@
-#include "services.h"
+#include "agent.h"
 using namespace watcheD;
 
 #include <fstream>
@@ -15,7 +15,9 @@ using namespace watcheD;
 #include <stdio.h>
 #include <sys/types.h>
 #include <dirent.h>
-#include <unistd.h>
+#include <sys/stat.h>
+#include <dlfcn.h>
+#include <unistd.h> 
 
 /*********************************
  * Sockets
@@ -97,7 +99,6 @@ bool process::haveSocket(uint32_t p_socket_id) {
  */
 void	service::setSocket(socket *p_sock) {
 	sockets.push_back(p_sock);
-	/*TODO: detect subsockets */
 }
 
 void 	service::addMainProcess(process *p_p) { 
@@ -105,7 +106,7 @@ void 	service::addMainProcess(process *p_p) {
 		name = p_p->getName();
 	mainProcess.push_back(p_p);
 	
-	//TODO: detect client processes (which have ppid=p_p)
+	//TODO: detect sub processes (which have ppid=p_p)
 }
 
 bool	service::haveSocket(uint32_t p_socket_id) {
@@ -132,8 +133,50 @@ void	service::getIndexHtml(std::stringstream& stream ) {
 /*********************************
  * ServicesManager
  */
+namespace watcheD {
+std::map<std::string, detector_maker_t *> detectorFactory;
+std::map<std::string, service_maker_t *> serviceFactory;
+}
+
 servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p_server), cfg(p_cfg) {
-	detectors.push_back(new socketDetector(this));
+	Json::Value*		servCfg	  = cfg->getServer();
+	DIR *			dir;
+	const std::string	directory = (*servCfg)["services_cpp"].asString();
+	class dirent*		ent;
+	class stat 		st;
+	void*			dlib;
+
+	// Load the services plugins
+	dir = opendir(directory.c_str());
+	while ((ent = readdir(dir)) != NULL) {
+		const std::string file_name = ent->d_name;
+		const std::string full_file_name = directory + "/" + file_name;
+
+		if (file_name[0] == '.')
+			continue;
+		if (stat(full_file_name.c_str(), &st) == -1)
+			continue;
+		const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+		if (is_directory)
+			continue;
+
+
+		if (file_name.substr(file_name.rfind(".")) == ".so") {
+			dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
+			if(dlib == NULL){
+				std::cerr << dlerror() << std::endl; 
+				exit(-1);
+			}
+		}
+	}
+	closedir(dir);
+	
+	// Instanciate the detector classes
+	std::map<std::string, detector_maker_t *, std::less<std::string> >::iterator factit;
+	for(factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
+		detectors.push_back(factit->second(this, server));
+
+	detectors.push_back(new socketDetector(this, server));
 	systemCollectors	= new CollectorsManager(server,cfg);
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	associate(server,"GET","^/$",doGetRootPage);
@@ -270,7 +313,7 @@ void socketDetector::find(void) {
 		for(std::vector<socket*>::iterator it = sockets.begin(); it != sockets.end(); ++it) {
 			if (!p->haveSocket((*it)->getID())) continue;
 			// service found
-			service *serv = new service();
+			service *serv = new service(server);
 			serv->addMainProcess(p);
 			serv->setSocket(*it);
 			services->addService(serv);
