@@ -10,16 +10,18 @@
 using namespace std;
 using namespace watcheD;
 
-void setResponse404(std::shared_ptr<HttpServer::Response> response, std::string content) {
+namespace watcheD {
+
+void setResponse404(response_ptr response, std::string content) {
 	*response << "HTTP/1.1 404 Not found\r\nServer: watched.agent\r\nContent-Length: " << content.length() << "\r\n\r\n" << content;
 }
-void setResponseHtml(std::shared_ptr<HttpServer::Response> response, std::string content) {
+void setResponseHtml(response_ptr response, std::string content) {
 	*response << "HTTP/1.1 200 OK\r\nServer: watched.agent\r\nAccess-Control-Allow-Origin:*\r\nContent-Type:text/html; charset=UTF-8\r\nContent-Length: " << content.length() << "\r\n\r\n" << content;
 }
-void setResponseJson(std::shared_ptr<HttpServer::Response> response, std::string content) {
+void setResponseJson(response_ptr response, std::string content) {
 	*response << "HTTP/1.1 200 OK\r\nServer: watched.agent\r\nContent-Type:application/json\r\nAccess-Control-Allow-Origin:*\r\nContent-Length: " << content.length() << "\r\n\r\n" << content;
 }
-
+}
 
 /*********************************
  * Ressource
@@ -83,7 +85,7 @@ void Ressource::getDefinition(Json::Value* p_defs) {
  * Collector
  */
 
-Collector::Collector(string p_name, HttpServer* p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), active(false),  server(p_server) {
+Collector::Collector(string p_name, HttpServer* p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), type("system"), active(false),  server(p_server) {
 	if(! cfg->isMember("history") && p_history>0) {
 		(*cfg)["history"] = p_history;
 		(*cfg)["history"].setComment(std::string("/*\t\tNumber of elements to keep*/"), Json::commentAfterOnSameLine);
@@ -124,9 +126,9 @@ void Collector::addRessource(string p_name, string p_desc, std::string p_typeNam
 }
 
 void Collector::addGetMetricRoute() {
-	associate(server,"GET","^/"+name+"/(.*)/history$",doGetHistory);
-	associate(server,"GET","^/"+name+"/(.*)/history.since=([0-9.]*)$",doGetHistory);
-	associate(server,"GET","^/"+name+"/(.*)/graph$",doGetGraph);
+	associate(server,"GET","^/"+type+"/"+name+"/(.*)/history$",doGetHistory);
+	associate(server,"GET","^/"+type+"/"+name+"/(.*)/history.since=([0-9.]*)$",doGetHistory);
+	associate(server,"GET","^/"+type+"/"+name+"/(.*)/graph$",doGetGraph);
 }
 
 void Collector::getDefinitions(Json::Value* p_defs) {
@@ -143,20 +145,20 @@ void Collector::getDefinitions(Json::Value* p_defs) {
 void Collector::getPaths(Json::Value* p_defs) {
 	if ((*cfg)["enable"].asBool()) {
 		for(map<string, Ressource*>::const_iterator i = ressources.begin();i!=ressources.end();i++) {
-			(*p_defs)["/"+name+"/"+i->first+"/history"]["get"]["summary"] = desc[i->first];
-			(*p_defs)["/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["name"] = "len";
-			(*p_defs)["/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["in"] = "query";
-			(*p_defs)["/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["type"] = "integer";
-			(*p_defs)["/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["required"] = false;
-			(*p_defs)["/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["description"] = "Length of the history to fetch";
-			(*p_defs)["/"+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["description"] = desc[i->first];
-			(*p_defs)["/"+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["schema"]["type"] = "array";
-			(*p_defs)["/"+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["schema"]["items"]["$ref"] = "#/definitions/"+i->second->typeName; //name+"-"+i->first;
+			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["summary"] = desc[i->first];
+			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["name"] = "len";
+			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["in"] = "query";
+			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["type"] = "integer";
+			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["required"] = false;
+			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["description"] = "Length of the history to fetch";
+			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["description"] = desc[i->first];
+			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["schema"]["type"] = "array";
+			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["schema"]["items"]["$ref"] = "#/definitions/"+i->second->typeName; //name+"-"+i->first;
 		}
 	}
 }
 
-void Collector::doGetGraph(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request) {
+void Collector::doGetGraph(response_ptr response, request_ptr request) {
 	string id   = request->path_match[1];
 	string str;
 	const char* name_c  = name.c_str();
@@ -174,7 +176,7 @@ void Collector::doGetGraph(std::shared_ptr<HttpServer::Response> response, std::
 	stream << "<script src=\"http://cdnjs.cloudflare.com/ajax/libs/morris.js/0.5.1/morris.min.js\"></script>\n";
 	stream << "</head><body><div id=\"" << name_c << "-graph\"></div>\n<script>\n";
 	stream << "function updateLiveGraph(" << name_c << "Graph) {\n";
-	stream << "  $.getJSON('/" << name_c << "/" << id.c_str() << "/history', function(results) { " << name_c;
+	stream << "  $.getJSON('/"+type+"/" << name_c << "/" << id.c_str() << "/history', function(results) { " << name_c;
 	stream << "Graph.setData(results); });\n}\n" << name_c << "Graph = new Morris."<< morrisType.c_str() << "({element: '" << name_c;
 	stream << "-graph',  data: [], xkey: 'timestamp', pointSize:0,fillOpacity:0.3," << morrisOpts.c_str();
 	stream << ressources[id]->getMorrisDesc().c_str() << "});\n";
@@ -184,7 +186,7 @@ void Collector::doGetGraph(std::shared_ptr<HttpServer::Response> response, std::
         setResponseHtml(response, stream.str());
 }
 
-void Collector::doGetHistory(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request) {
+void Collector::doGetHistory(response_ptr response, request_ptr request) {
 	string name   = request->path_match[1];
 	double since  = -1;
 	if (request->path_match.size()>1) {
@@ -207,7 +209,7 @@ void Collector::getIndexHtml(std::stringstream& stream ){
 	if ((*cfg)["enable"].asBool()) {
 		stream << "<h3>" << name.c_str() << "</h3><ul>\n";
 		for(map<string, Ressource*>::const_iterator i = ressources.begin();i!=ressources.end();i++) {
-			stream << "<li><a href=\"/" << name.c_str() << "/" << i->first.c_str() << "/graph\">" << desc[i->first].c_str() << "</a></li>\n";
+			stream << "<li><a href=\"/"+type+"/" << name.c_str() << "/" << i->first.c_str() << "/graph\">" << desc[i->first].c_str() << "</a></li>\n";
 		}
 		stream << "</ul>\n";
 	}
@@ -222,55 +224,18 @@ namespace watcheD {
 map<string, collector_maker_t *> factory;
 }
 
-void CollectorsManager::doGetRootPage(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request) {
-	std::stringstream stream;
-        stream << "<html><head><title>" << APPS_NAME.c_str() << "</title>\n";
-	stream << "</head><body>\n";
+
+void CollectorsManager::getIndexHtml(std::stringstream& stream ) {
 	for(std::map<std::string, Collector*>::iterator i = collectors.begin();i != collectors.end();i++) {
 		i->second->getIndexHtml(stream);
 	} 
-	stream << "</body></html>\n";
-        setResponseHtml(response, stream.str());
 }
-void CollectorsManager::doGetJson(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request) {
-	Json::Value res(Json::objectValue);
-	Json::StreamWriterBuilder wbuilder;
-	Json::Value obj(Json::objectValue);
+void CollectorsManager::getJson(Json::Value* p_defs) {
 	int cnt = 0;
-	std::string document;
-	
-	res["swagger"]			= "2.0";
-	res["info"]["version"]		= "1.0.0";
-	res["info"]["title"]		= APPS_NAME;
-	res["info"]["description"]	= APPS_DESC;
-	//res["info"]["termsOfService"]	= "http://some.url/terms/";
-	res["info"]["contact"]["name"]	= "Sebastien Huss";
-	res["info"]["contact"]["email"]	= "sebastien.huss@gmail.com";
-	//res["info"]["contact"]["url"]	= "http://sebastien.huss.free.fr/";
-	res["info"]["license"]["name"]	= "AGPL";
-	res["info"]["license"]["url"]	= "https://www.gnu.org/licenses/agpl-3.0.html";
-	// add swaggerised docs
-	//res["externalDocs"]["description"]	= "API documentation";
-	//res["externalDocs"]["url"]		= "http://some.url/docs";
-	
-	res["host"]			= "localhost";
-	res["basePath"]			= "/";
-	res["schemes"][0]		= "http";
-	res["consumes"][0]		= "application/json";
-	res["produces"][0]		= "application/json";
-	res["definitions"]		= obj;
-	res["paths"]			= obj;
-
-
 	for(std::map<std::string, Collector*>::iterator i = collectors.begin();i != collectors.end();i++,cnt++) {
-		i->second->getDefinitions(&res["definitions"]);
-		i->second->getPaths(&res["paths"]);
+		i->second->getDefinitions(&((*p_defs)["definitions"]));
+		i->second->getPaths(&((*p_defs)["paths"]));
 	}
-
-	wbuilder["indentation"] = "\t";
-	document = Json::writeString(wbuilder, res);
-
-	setResponseJson(response, document);
 }
 
 
@@ -335,10 +300,6 @@ CollectorsManager::CollectorsManager(HttpServer* p_server, Config* p_cfg) : serv
 		}
 	}
 	closedir(dir);
-	
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
-	associate(server,"GET","^/$",doGetRootPage);
-	associate(server,"GET","^/api/swagger.json$",doGetJson);
 }
 
 void CollectorsManager::startThreads() {

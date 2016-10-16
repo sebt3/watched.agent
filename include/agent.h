@@ -7,6 +7,10 @@ extern const std::string APPS_NAME;
 extern const std::string APPS_DESC;
 namespace watcheD {
 
+void setResponse404(response_ptr response, std::string content);
+void setResponseHtml(response_ptr response, std::string content);
+void setResponseJson(response_ptr response, std::string content);
+
 /*********************************
  * Config
  */
@@ -30,8 +34,8 @@ public:
 	CollectorsManager(HttpServer *p_server, Config* p_cfg);
 	~CollectorsManager();
 	void startThreads();
-	void doGetJson(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request);
-	void doGetRootPage(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request);
+	void getJson(Json::Value* p_defs);
+	void getIndexHtml(std::stringstream& stream );
 	HttpServer* server;
 	Config *cfg;
 	std::map<std::string, Collector*>	collectors;
@@ -60,7 +64,7 @@ private:
 
 
 /*********************************
- * Access-Control-Allow-Origin
+ * Access-Control-Allow-Origin for pistache
  *
 
 class acao : public Net::Http::Header::Header {

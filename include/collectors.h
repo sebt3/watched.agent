@@ -8,6 +8,8 @@
 #include "client_http.hpp"
 typedef SimpleWeb::Server<SimpleWeb::HTTP> HttpServer;
 typedef SimpleWeb::Client<SimpleWeb::HTTP> HttpClient;
+typedef std::shared_ptr<HttpServer::Response> response_ptr;
+typedef std::shared_ptr<HttpServer::Request> request_ptr;
 
 namespace watcheD {
 
@@ -62,9 +64,8 @@ public:
 	
 	virtual void collect() =0;
 
-	//void thread();
-	void doGetHistory(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request);
-	void doGetGraph(std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request);
+	void doGetHistory(response_ptr response, request_ptr request);
+	void doGetGraph(response_ptr response, request_ptr request);
 	void getDefinitions(Json::Value* p_defs);
 	void getPaths(Json::Value* p_defs);
 	void getIndexHtml(std::stringstream& stream );
@@ -77,6 +78,7 @@ protected:
 	std::string morrisType;
 	std::string morrisOpts;
 	std::string name;
+	std::string type;
 private:
 	bool active;
 	std::thread my_thread;
@@ -93,7 +95,7 @@ extern std::map<std::string, collector_maker_t *> factory;
 }
 
 #define associate(s,type,regex,method)				\
-server->resource[regex][type]=[this](std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request) { this->method(response, request); }
+server->resource[regex][type]=[this](response_ptr response, request_ptr request) { this->method(response, request); }
 #define MAKE_PLUGIN_COLLECTOR(className,id)			\
 extern "C" {							\
 Collector *maker(HttpServer* p_srv, Json::Value* p_cfg){	\

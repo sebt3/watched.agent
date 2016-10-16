@@ -1,4 +1,5 @@
 #include "agent.h"
+#include "services.h"
 #include <fstream>
 using namespace watcheD;
 
@@ -75,10 +76,15 @@ int main(int argc, char *argv[]) {
 		}
 	};
 
-	CollectorsManager cm(&server,&cfg);
+	//CollectorsManager cm(&server,&cfg);
+	servicesManager *sm = new servicesManager(&server,&cfg);
 	cfg.save();
-	cm.startThreads();
-	
+
+	sm->startThreads();
+	//cm.startThreads();
+
+	sm->find();
+
 	server.start();
 
 	return 0;
