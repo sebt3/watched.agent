@@ -69,4 +69,4 @@ public:
 };
 
 
-MAKE_PLUGIN_COLLECTOR(diskStatsCollector, "diskstats")
+MAKE_PLUGIN_COLLECTOR(diskStatsCollector, diskstats)

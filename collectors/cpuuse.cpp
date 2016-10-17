@@ -110,4 +110,4 @@ public:
 };
 
 
-MAKE_PLUGIN_COLLECTOR(CpuUseCollector, "cpuuse")
+MAKE_PLUGIN_COLLECTOR(CpuUseCollector, cpuuse)

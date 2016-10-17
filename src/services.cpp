@@ -50,6 +50,19 @@ std::string socket::getSource() {
  * Process
  */
 process::process(uint32_t p_pid): pid(p_pid) {
+	char buf[512];
+	std::string file;
+	// get the full_path & base_name
+	file="/proc/"+std::to_string(pid)+"/exe";
+	int count = readlink(file.c_str(), buf, sizeof(buf));
+	if(count>0) {
+		buf[count] = '\0';
+		full_path = buf;
+		base_name = full_path.substr(full_path.rfind("/")+1);
+	}
+}
+
+void process::setSockets() {
 	// get all its opened sockets
 	DIR *dir;
 	char buf[512];
@@ -74,15 +87,6 @@ process::process(uint32_t p_pid): pid(p_pid) {
 	}
 	}while(false);
 	closedir (dir);
-
-	// get the full_path & base_name
-	file="/proc/"+std::to_string(pid)+"/exe";
-	int count = readlink(file.c_str(), buf, sizeof(buf));
-	if(count>0) {
-		buf[count] = '\0';
-		full_path = buf;
-		base_name = full_path.substr(full_path.rfind("/")+1);
-	}
 }
 
 bool process::haveSocket(uint32_t p_socket_id) {
@@ -97,6 +101,19 @@ bool process::haveSocket(uint32_t p_socket_id) {
 /*********************************
  * Services
  */
+service::service(const service& p_src) {
+	// copy constructor
+	name	= p_src.name;
+	type	= p_src.type;
+	cfg	= p_src.cfg;
+	server	= p_src.server;
+	for(std::vector<socket *>::const_iterator i=p_src.sockets.begin();i!=p_src.sockets.end();i++)
+		sockets.push_back(*i);
+	for(std::vector<process *>::const_iterator i=p_src.mainProcess.begin();i!=p_src.mainProcess.end();i++)
+		mainProcess.push_back(*i);
+	
+}
+
 void	service::setSocket(socket *p_sock) {
 	sockets.push_back(p_sock);
 }
@@ -122,7 +139,7 @@ bool	service::havePID(uint32_t p_pid) {
 }
 
 void	service::getIndexHtml(std::stringstream& stream ) {
-		stream << "<h3>" << name << "</h3><ul>\n";
+		stream << "<h3>" << name << "(" << type << ")</h3><ul>\n";
 		for(std::vector<socket *>::iterator i=sockets.begin();i!=sockets.end();i++)
 			stream << "<li>" << (*i)->getSource() << "</li>\n";
 		for(std::vector<process *>::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
@@ -135,7 +152,8 @@ void	service::getIndexHtml(std::stringstream& stream ) {
  */
 namespace watcheD {
 std::map<std::string, detector_maker_t *> detectorFactory;
-std::map<std::string, service_maker_t *> serviceFactory;
+std::map<std::string,  service_maker_t *>  serviceFactory;
+std::map<std::string, enhancer_maker_t *> enhancerFactory;
 }
 
 servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p_server), cfg(p_cfg) {
@@ -172,9 +190,12 @@ servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p
 	closedir(dir);
 	
 	// Instanciate the detector classes
-	std::map<std::string, detector_maker_t *, std::less<std::string> >::iterator factit;
-	for(factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
+	for(std::map<std::string, detector_maker_t *>::iterator factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
 		detectors.push_back(factit->second(this, server));
+
+	// then the enhancer
+	for(std::map<std::string, enhancer_maker_t *>::iterator factit = enhancerFactory.begin();factit != enhancerFactory.end(); factit++)
+		enhancers.push_back(factit->second(this));
 
 	detectors.push_back(new socketDetector(this, server));
 	systemCollectors	= new CollectorsManager(server,cfg);
@@ -188,7 +209,16 @@ void servicesManager::startThreads() {
 
 void servicesManager::addService(service *p_serv) {
 	// TODO: detect if the service isnt already known
-	services.push_back(p_serv);
+	service *add = p_serv;
+	// try to improve the service
+	for(std::vector<serviceEnhancer *>::iterator i=enhancers.begin();i!=enhancers.end();i++) {
+		service *s = (*i)->enhance(p_serv);
+		if (s!=NULL) {
+			add=s;
+			break;
+		}
+	}
+	services.push_back(add);
 }
 
 void servicesManager::find() {
@@ -200,6 +230,14 @@ bool	servicesManager::haveSocket(uint32_t p_socket_id) {
 	for (std::vector<service *>::iterator i=services.begin();i!=services.end();i++)
 		if ((*i)->haveSocket(p_socket_id)) return true;
 	return false;
+}
+
+service *servicesManager::enhanceFromFactory(std::string p_id, service *p_serv) {
+	for(std::map<std::string, service_maker_t *>::iterator i=serviceFactory.begin();i!=serviceFactory.end();i++) {
+		if (i->first == p_id)
+			return i->second(*p_serv);
+	}
+	return NULL;
 }
 
 bool	servicesManager::havePID(uint32_t p_pid) {
@@ -260,7 +298,7 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 
 
 /*********************************
- * Detectors
+ * Detectors  
  */
 void socketDetector::find(void) {
 	//TODO: add suport for ipv6 sockets
@@ -295,6 +333,8 @@ void socketDetector::find(void) {
 	if (unfile.good())
 		unfile.close();
 
+	if (sockets.size()<1) 
+		return;
 	// find all processes
 	DIR *dir;
 	struct dirent *ent;
@@ -309,6 +349,7 @@ void socketDetector::find(void) {
 		if (services->havePID(atoi(file.c_str())))
 			continue; // process already associated to a service
 		p = new process(atoi(file.c_str()));
+		p->setSockets();
 		found = false;
 		for(std::vector<socket*>::iterator it = sockets.begin(); it != sockets.end(); ++it) {
 			if (!p->haveSocket((*it)->getID())) continue;
@@ -316,8 +357,6 @@ void socketDetector::find(void) {
 			service *serv = new service(server);
 			serv->addMainProcess(p);
 			serv->setSocket(*it);
-			services->addService(serv);
-			found = true;
 			// remove the now associated socket from the list
 			sockets.erase(it);
 			// trying to associate more sockets to this service
@@ -326,6 +365,8 @@ void socketDetector::find(void) {
 				serv->setSocket(*i);
 				i = sockets.erase(i);
 			}
+			services->addService(serv);
+			found = true;
 			break;
 		}
 		// free unused process

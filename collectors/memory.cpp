@@ -84,4 +84,4 @@ public:
 	}
 };
 
-MAKE_PLUGIN_COLLECTOR(MemoryCollector, "memory")
+MAKE_PLUGIN_COLLECTOR(MemoryCollector, memory)

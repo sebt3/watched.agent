@@ -62,4 +62,4 @@ public:
 };
 
 
-MAKE_PLUGIN_COLLECTOR(vmStatCollector, "vmstat")
+MAKE_PLUGIN_COLLECTOR(vmStatCollector, vmstat)

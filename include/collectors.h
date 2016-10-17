@@ -98,13 +98,13 @@ extern std::map<std::string, collector_maker_t *> collectorFactory;
 server->resource[regex][type]=[this](response_ptr response, request_ptr request) { this->method(response, request); }
 #define MAKE_PLUGIN_COLLECTOR(className,id)			\
 extern "C" {							\
-Collector *maker(HttpServer* p_srv, Json::Value* p_cfg){	\
+Collector *maker_##id(HttpServer* p_srv, Json::Value* p_cfg){	\
    return new className(p_srv, p_cfg);				\
 }								\
 }								\
-class proxy { public:						\
-   proxy(){ collectorFactory[id] = maker; }			\
+class proxy_##id { public:					\
+   proxy_##id(){ collectorFactory[#id] = maker_##id; }		\
 };								\
-proxy p;
+proxy_##id p;
 
 

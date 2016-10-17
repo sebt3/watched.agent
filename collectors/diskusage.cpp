@@ -98,4 +98,4 @@ public:
 };
 
 
-MAKE_PLUGIN_COLLECTOR(diskUsageCollector, "diskusage")
+MAKE_PLUGIN_COLLECTOR(diskUsageCollector, diskusage)

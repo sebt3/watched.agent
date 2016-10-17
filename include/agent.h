@@ -64,8 +64,6 @@ private:
 /*********************************
  * ServicesManager
  */
-//TODO: add support for plugin detectors
-//TODO: add support for enhancers (being plugin or not)
 //TODO: plugins should be able to be written in lua
 
 class servicesManager {
@@ -78,9 +76,11 @@ public:
 	void	doGetJson(response_ptr response, request_ptr request);
 	void	doGetRootPage(response_ptr response, request_ptr request);
 	void	startThreads();
+	service *enhanceFromFactory(std::string p_id, service *p_serv);
 private:
 	std::vector<service *>		services;
 	std::vector<serviceDetector *>	detectors;
+	std::vector<serviceEnhancer *>	enhancers;
 	CollectorsManager*		systemCollectors;
 	HttpServer* server;
 	Config *cfg;

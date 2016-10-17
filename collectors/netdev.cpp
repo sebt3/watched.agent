@@ -70,4 +70,4 @@ public:
 };
 
 
-MAKE_PLUGIN_COLLECTOR(NetDevCollector, "netdev")
+MAKE_PLUGIN_COLLECTOR(NetDevCollector, netdev)
