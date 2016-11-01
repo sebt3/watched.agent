@@ -22,6 +22,7 @@ struct sock_addr {
 class socket {
 public:
 	socket(std::string p_line, std::string p_type);
+	socket(std::string p_source);
 	uint32_t getID() { return id; }
 	std::string getSource();
 protected:
@@ -39,6 +40,7 @@ private:
 class process {
 public:
 	process(uint32_t p_pid);
+	process(std::string p_fullpath);
 	void setSockets();
 	bool haveSocket(uint32_t p_socket_id);
 	bool getStatus();
@@ -61,31 +63,38 @@ private:
 class serviceHandler;
 class service {
 public:
-	service(HttpServer* p_server): name(""), type("unknown"), cfg(NULL), handler(NULL), server(p_server) {}
+	service(HttpServer* p_server);
+	service(HttpServer* p_server, std::string p_file_path);
 	service(const service& p_src);
-	void		setSocket(socket *p_sock);
-	void 		addMainProcess(process *p_p);
+	void		updateFrom(service *src);
+
+	bool		operator==(const service& rhs);
+	inline bool	operator!=(const service& rhs){return !operator==(rhs);}
 	bool		haveSocket(uint32_t p_socket_id);
 	bool		haveSocket(std::string p_source) const;
 	bool		havePID(uint32_t p_pid);
-	void		getIndexHtml(std::stringstream& stream );
-	void		setHandler(serviceHandler* p_h) { handler = p_h; }
 	bool		haveHandler() { return handler != NULL; }
 	std::string	getType() { return type; }
-	void		setType(std::string p_type) { type=p_type; }
 	std::string	getName() { return name; }
+
+	void		setSocket(socket *p_sock);
+	void 		addMainProcess(process *p_p);
+	void		setHandler(serviceHandler* p_h) { handler = p_h; }
+	void		setType(std::string p_type) { type=p_type; }
 	void		setName(std::string p_name) { name=p_name; }
+
+	void		saveConfigTemplate(std::string p_cfg_dir);
+	void		getIndexHtml(std::stringstream& stream );
 	void		doGetStatus(response_ptr response, request_ptr request);
 	void		getJson(Json::Value* p_defs);
-	bool		operator==(const service& rhs);
-	inline bool	operator!=(const service& rhs){return !operator==(rhs);}
-	void		updateFrom(service *src);
 protected:
+	void		setDefaultConfig();
 	std::string		name;
 	std::string		type;
-	Json::Value*		cfg;
+	Json::Value		cfg;
 	serviceHandler*		handler;
 private:
+	std::string		cfgFile;
 	HttpServer*		server;
 	std::vector<socket *>	sockets;
 	std::vector<process *>	mainProcess;

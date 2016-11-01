@@ -34,6 +34,10 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 		data["plugins"]["services_cpp"] = "services";
 		data["plugins"]["services_cpp"].setComment(std::string("/*\t\tThe directory where the *.so services plugins are stored*/"), Json::commentAfterOnSameLine);
 	}
+	if (! data["plugins"].isMember("services_conf")) {
+		data["plugins"]["services_conf"] = "cfgs";
+		data["plugins"]["services_conf"].setComment(std::string("/*\t\tThe directory where the *.json service configuration files are stored*/"), Json::commentAfterOnSameLine);
+	}
 	if (! data["plugins"].isMember("collectors_cpp")) {
 		data["plugins"]["collectors_cpp"] = "collectors";
 		data["plugins"]["collectors_cpp"].setComment(std::string("/*\t\tThe directory where the *.so collector plugins are stored*/"), Json::commentAfterOnSameLine);

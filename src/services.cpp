@@ -32,6 +32,17 @@ socket::socket(std::string p_line, std::string p_type) : type(p_type) {
 	id = atoi(tokens[9].c_str());
 }
 
+socket::socket(std::string p_source) {
+	char dot;
+	type = p_source.substr(0,p_source.find(":"));
+	auto pos = p_source.find(":")+3;
+	std::string port = p_source.substr(p_source.find(":",pos)+1);
+	source.port  = strtoul(port.c_str(), NULL, 10);
+	std::string ip = p_source.substr(pos, p_source.find(":",pos)-pos);
+	std::istringstream s(ip);
+	s>>source.ip1>>dot>>source.ip2>>dot>>source.ip3>>dot>>source.ip4;
+	//std::cout << "type = " <<type<< ", ip = " <<ip<< " port= " <<source.port<< std::endl;
+}
 void socket::setSockFrom(std::string src, struct sock_addr *sa) {
 	std::string port = src.substr(src.find(":")+1, src.length());
 	sa->port = strtoul(port.c_str(), NULL, 16);
@@ -62,6 +73,10 @@ process::process(uint32_t p_pid): pid(p_pid) {
 	}
 }
 
+process::process(std::string p_fullpath):pid(0), full_path(p_fullpath) {
+	base_name = full_path.substr(full_path.rfind("/")+1);
+}
+
 void process::setSockets() {
 	// get all its opened sockets
 	DIR *dir;
@@ -81,6 +96,7 @@ void process::setSockets() {
 		if (count<=0) continue;
 		buf[count] = '\0';
 		link = buf;
+		// check if it's a socket
 		if (link.compare(0, soc.length(), soc) !=0)
 			continue;
 		sockets.push_back(atoi(link.substr(soc.length()).c_str()));
@@ -107,12 +123,30 @@ bool process::getStatus() {
 /*********************************
  * Services
  */
+service::service(HttpServer* p_server): name(""), type("unknown"), cfg(Json::objectValue), handler(NULL), server(p_server) {
+}
+
+service::service(HttpServer* p_server, std::string p_file_path): name(""), type("unknown"), cfg(Json::objectValue), handler(NULL), cfgFile(p_file_path), server(p_server) {
+	std::ifstream cfgif (cfgFile);
+	if (cfgif.good()) {
+		cfgif >> cfg;
+		cfgif.close();
+	}
+	if (cfg.isMember("process")) 
+		for (const Json::Value& line : cfg["process"])
+			addMainProcess(new process(line.asString()));
+	if (cfg.isMember("sockets")) 
+		for (const Json::Value& line : cfg["sockets"])
+			setSocket(new socket(line.asString()));
+}
+
 service::service(const service& p_src) {
 	// copy constructor
 	name	= p_src.name;
 	type	= p_src.type;
 	cfg	= p_src.cfg;
 	server	= p_src.server;
+	cfgFile = p_src.cfgFile;
 	for(std::vector<socket *>::const_iterator i=p_src.sockets.begin();i!=p_src.sockets.end();i++)
 		sockets.push_back(*i);
 	for(std::vector<process *>::const_iterator i=p_src.mainProcess.begin();i!=p_src.mainProcess.end();i++)
@@ -121,6 +155,30 @@ service::service(const service& p_src) {
 		collectors.push_back(*i);
 	if (mainProcess.size() > 0)
 		associate(server,"GET","^/service/"+name+"/status$",doGetStatus);
+}
+void	service::setDefaultConfig() {
+	Json::Value arr(Json::arrayValue);
+
+	if (! cfg.isMember("sockets"))
+		cfg["sockets"] = arr;
+	else
+		cfg["sockets"].clear();
+	for(std::vector<socket *>::iterator i=sockets.begin();i!=sockets.end();i++)
+		cfg["sockets"].append((*i)->getSource());
+
+	if (! cfg.isMember("process"))
+		cfg["process"] = arr;
+	else
+		cfg["process"].clear();
+	for(std::vector<process *>::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
+		cfg["process"].append((*i)->getPath());
+}
+void	service::saveConfigTemplate(std::string p_cfg_dir){
+	setDefaultConfig();
+	std::string fname = p_cfg_dir+std::string("/")+name+std::string(".json.template");
+	std::ofstream cfgof (fname, std::ifstream::out);
+	cfgof<<cfg;
+	cfgof.close();
 }
 
 void	service::setSocket(socket *p_sock) {
@@ -133,10 +191,6 @@ void 	service::addMainProcess(process *p_p) {
 	mainProcess.push_back(p_p);
 	std::string tmp = name;
 	associate(server,"GET","^/service/"+tmp+"/status$",doGetStatus);
-	if (name == "watched.agent")
-		for(auto i = server->resource.begin();i!=server->resource.end();i++) {
-			std::cout << i->first << std::endl;
-	}
 	
 	//TODO: detect sub processes (which have ppid=p_p)
 }
@@ -232,12 +286,34 @@ std::map<std::string,  service_maker_t *>  serviceFactory;
 servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p_server), cfg(p_cfg) {
 	Json::Value*		servCfg	  = cfg->getPlugins();
 	DIR *			dir;
-	const std::string	directory = (*servCfg)["services_cpp"].asString();
+	std::string		directory = (*servCfg)["services_conf"].asString();
 	class dirent*		ent;
 	class stat 		st;
 	void*			dlib;
 
+	// Load the services configuration
+	dir = opendir(directory.c_str());
+	while ((ent = readdir(dir)) != NULL) {
+		const std::string file_name = ent->d_name;
+		const std::string full_file_name = directory + "/" + file_name;
+
+		if (file_name[0] == '.')
+			continue;
+		if (stat(full_file_name.c_str(), &st) == -1)
+			continue;
+		const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+		if (is_directory)
+			continue;
+
+		if (file_name.substr(file_name.rfind(".")) == ".json") {
+			services.push_back(new service(server, full_file_name));
+		}
+	}
+	closedir(dir);
+	
+	
 	// Load the services plugins
+	directory = (*servCfg)["services_cpp"].asString();
 	dir = opendir(directory.c_str());
 	while ((ent = readdir(dir)) != NULL) {
 		const std::string file_name = ent->d_name;
@@ -306,7 +382,12 @@ void servicesManager::addService(service *p_serv) {
 			return;
 		}
 	}
+	// reload the server to enable the new URLs
 	server->reload();
+	// save the template config
+	Json::Value*		servCfg	  = cfg->getPlugins();
+	add->saveConfigTemplate((*servCfg)["services_conf"].asString());
+	// adding the service to the list
 	services.push_back(add);
 }
 
