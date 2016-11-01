@@ -1,5 +1,6 @@
 #include "agent.h"
 #include <fstream>
+#include <chrono>
 using namespace watcheD;
 
 #include <boost/filesystem.hpp>
@@ -75,15 +76,10 @@ int main(int argc, char *argv[]) {
 		}
 	};
 
-	//CollectorsManager cm(&server,&cfg);
 	servicesManager *sm = new servicesManager(&server,&cfg);
 	cfg.save();
 
 	sm->startThreads();
-	//cm.startThreads();
-
-	sm->find();
-
 	server.start();
 
 	return 0;

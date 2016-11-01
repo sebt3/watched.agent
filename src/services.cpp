@@ -97,6 +97,12 @@ bool process::haveSocket(uint32_t p_socket_id) {
 	return false;
 }
 
+bool process::getStatus() {
+	std::string p = "/proc/"+std::to_string(pid);
+	struct stat buffer;
+	return (stat (p.c_str(), &buffer) == 0); 
+}
+
 
 /*********************************
  * Services
@@ -111,7 +117,10 @@ service::service(const service& p_src) {
 		sockets.push_back(*i);
 	for(std::vector<process *>::const_iterator i=p_src.mainProcess.begin();i!=p_src.mainProcess.end();i++)
 		mainProcess.push_back(*i);
-	
+	for(std::vector<Collector *>::const_iterator i=p_src.collectors.begin();i!=p_src.collectors.end();i++)
+		collectors.push_back(*i);
+	if (mainProcess.size() > 0)
+		associate(server,"GET","^/service/"+name+"/status$",doGetStatus);
 }
 
 void	service::setSocket(socket *p_sock) {
@@ -122,6 +131,12 @@ void 	service::addMainProcess(process *p_p) {
 	if (mainProcess.size()==0)
 		name = p_p->getName();
 	mainProcess.push_back(p_p);
+	std::string tmp = name;
+	associate(server,"GET","^/service/"+tmp+"/status$",doGetStatus);
+	if (name == "watched.agent")
+		for(auto i = server->resource.begin();i!=server->resource.end();i++) {
+			std::cout << i->first << std::endl;
+	}
 	
 	//TODO: detect sub processes (which have ppid=p_p)
 }
@@ -138,13 +153,70 @@ bool	service::havePID(uint32_t p_pid) {
 	return false;
 }
 
+void	service::doGetStatus(response_ptr response, request_ptr request) {
+	//string name   = request->path_match[1];
+	std::stringstream ss;
+	Json::Value ret(Json::objectValue);
+	
+	int n=0;for(std::vector<socket *>::iterator i=sockets.begin();i!=sockets.end();i++,n++) {
+		ret["sockets"][n]["name"]   = (*i)->getSource();
+		ret["sockets"][n]["status"] = "ok"; // TODO actually support this for correct service monitoring
+	}
+	n=0;for(std::vector<process *>::iterator i=mainProcess.begin();i!=mainProcess.end();i++,n++) {
+		ret["process"][n]["name"]   = (*i)->getName();
+		ret["process"][n]["status"] = "ok";
+		if (! (*i)->getStatus()) {
+			std::string stts = "failed";
+			if (haveHandler() && handler->isBlackout())
+				stts = "ok (blackout)";
+			ret["process"][n]["status"] = stts;
+		}
+		else
+			ret["process"][n]["pid"]  = (*i)->getPID();
+	}
+		
+	ss << ret;
+	
+	setResponseJson(response, ss.str());
+}
+
 void	service::getIndexHtml(std::stringstream& stream ) {
-		stream << "<h3>" << name << "(" << type << ")</h3><ul>\n";
-		for(std::vector<socket *>::iterator i=sockets.begin();i!=sockets.end();i++)
-			stream << "<li>" << (*i)->getSource() << "</li>\n";
-		for(std::vector<process *>::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
-			stream << "<li>" << (*i)->getPath() << "</li>\n";
-		stream << "</ul>\n";
+	stream << "<h3><a href='/service/" << name <<"/status'>" << name << "(" << type << ")</a></h3>\n";
+}
+
+void	service::getJson(Json::Value* p_defs) {
+	std::string p = "/service/"+name+"/status";
+	(*p_defs)["paths"][p]["get"]["responses"]["200"]["schema"]["$ref"] = "#/definitions/services";
+	(*p_defs)["paths"][p]["get"]["responses"]["200"]["description"] = name+" status";
+	(*p_defs)["paths"][p]["get"]["summary"] = name+" service status";
+}
+
+bool	service::haveSocket(std::string p_source) const {
+	for(std::vector<socket *>::const_iterator i=sockets.begin();i!=sockets.end();i++) {
+		if ((*i)->getSource()  == p_source)
+			return true;
+	}
+	return false;
+}
+
+bool	service::operator==(const service& rhs) {
+	if (name != rhs.name) return false;
+	if (type != rhs.type) return false;
+	for(std::vector<socket *>::iterator i=sockets.begin();i!=sockets.end();i++) {
+		if (!rhs.haveSocket((*i)->getSource()))
+			return false;
+	}
+	//TODO: service matching should be smarter than this (checking process name too)
+	return true;
+}
+
+void	service::updateFrom(service *src) {
+	while(!mainProcess.empty()) {
+		delete mainProcess.back();
+		mainProcess.pop_back();
+	}
+	for(std::vector<process *>::iterator i=src->mainProcess.begin();i!=src->mainProcess.end();i++)
+		addMainProcess((*i));
 }
 
 /*********************************
@@ -152,12 +224,13 @@ void	service::getIndexHtml(std::stringstream& stream ) {
  */
 namespace watcheD {
 std::map<std::string, detector_maker_t *> detectorFactory;
-std::map<std::string,  service_maker_t *>  serviceFactory;
 std::map<std::string, enhancer_maker_t *> enhancerFactory;
+std::map<std::string,  handler_maker_t *>  handlerFactory;
+std::map<std::string,  service_maker_t *>  serviceFactory;
 }
 
 servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p_server), cfg(p_cfg) {
-	Json::Value*		servCfg	  = cfg->getServer();
+	Json::Value*		servCfg	  = cfg->getPlugins();
 	DIR *			dir;
 	const std::string	directory = (*servCfg)["services_cpp"].asString();
 	class dirent*		ent;
@@ -203,12 +276,18 @@ servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p
 	associate(server,"GET","^/$",doGetRootPage);
 	associate(server,"GET","^/api/swagger.json$",doGetJson);
 }
+
 void servicesManager::startThreads() {
 	systemCollectors->startThreads();
+	find();
+	my_thread = std::thread ([this]() {
+		std::this_thread::sleep_for(std::chrono::seconds(10));
+		find();
+	});
+
 }
 
 void servicesManager::addService(service *p_serv) {
-	// TODO: detect if the service isnt already known
 	service *add = p_serv;
 	// try to improve the service
 	for(std::vector<serviceEnhancer *>::iterator i=enhancers.begin();i!=enhancers.end();i++) {
@@ -218,6 +297,16 @@ void servicesManager::addService(service *p_serv) {
 			break;
 		}
 	}
+
+	// Detect if the service isnt already known
+	for (std::vector<service *>::iterator i=services.begin();i!=services.end();i++){
+		if ( *(*i) == *add ) {
+			(*i)->updateFrom(add);
+			delete add;
+			return;
+		}
+	}
+	server->reload();
 	services.push_back(add);
 }
 
@@ -249,13 +338,13 @@ bool	servicesManager::havePID(uint32_t p_pid) {
 void servicesManager::doGetRootPage(response_ptr response, request_ptr request) {
 	std::stringstream stream;
         stream << "<html><head><title>" << APPS_NAME.c_str() << "</title>\n";
-	stream << "</head><body><h1>Services</h1>\n";
+	stream << "</head><body><table width=100%><tr><td><h1>Services</h1>\n";
 	for (std::vector<service *>::iterator i=services.begin();i!=services.end();i++)
 		(*i)->getIndexHtml(stream);
 
-	stream << "<h1>System</h1>\n";
+	stream << "</td><td><h1>System</h1>\n";
 	systemCollectors->getIndexHtml(stream);
-	stream << "</body></html>\n";
+	stream << "</td></tr></table></body></html>\n";
         setResponseHtml(response, stream.str());
 }
 
@@ -265,29 +354,42 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 	Json::Value obj(Json::objectValue);
 	std::string document;
 	
-	res["swagger"]			= "2.0";
-	res["info"]["version"]		= "1.0.0";
-	res["info"]["title"]		= APPS_NAME;
-	res["info"]["description"]	= APPS_DESC;
-	//res["info"]["termsOfService"]	= "http://some.url/terms/";
-	res["info"]["contact"]["name"]	= "Sebastien Huss";
-	res["info"]["contact"]["email"]	= "sebastien.huss@gmail.com";
-	//res["info"]["contact"]["url"]	= "http://sebastien.huss.free.fr/";
-	res["info"]["license"]["name"]	= "AGPL";
-	res["info"]["license"]["url"]	= "https://www.gnu.org/licenses/agpl-3.0.html";
+	res["swagger"]				= "2.0";
+	res["info"]["version"]			= "1.0.0";
+	res["info"]["title"]			= APPS_NAME;
+	res["info"]["description"]		= APPS_DESC;
+	//res["info"]["termsOfService"]		= "http://some.url/terms/";
+	res["info"]["contact"]["name"]		= "Sebastien Huss";
+	res["info"]["contact"]["email"]		= "sebastien.huss@gmail.com";
+	res["info"]["contact"]["url"]		= "https://sebt3.github.io/watched/";
+	res["info"]["license"]["name"]		= "AGPL";
+	res["info"]["license"]["url"]		= "https://www.gnu.org/licenses/agpl-3.0.html";
 	// add swaggerised docs
-	//res["externalDocs"]["description"]	= "API documentation";
-	//res["externalDocs"]["url"]		= "http://some.url/docs";
+	res["externalDocs"]["description"]	= "Documentation";
+	res["externalDocs"]["url"]		= "https://sebt3.github.io/watched/doc/";
 	
-	res["host"]			= "localhost";
-	res["basePath"]			= "/";
-	res["schemes"][0]		= "http";
-	res["consumes"][0]		= "application/json";
-	res["produces"][0]		= "application/json";
-	res["definitions"]		= obj;
-	res["paths"]			= obj;
+	res["host"]				= "localhost";
+	res["basePath"]				= "/";
+	res["schemes"][0]			= "http";
+	res["consumes"][0]			= "application/json";
+	res["produces"][0]			= "application/json";
+	res["definitions"]["services"]["type"]	= "object";
+	res["paths"]				= obj;
 
 	systemCollectors->getJson(&res);
+	res["definitions"]["serviceProcess"]["type"]				= "object";
+	res["definitions"]["serviceProcess"]["properties"]["name"]["type"]	= "string";
+	res["definitions"]["serviceProcess"]["properties"]["pid"]["type"]	= "number";
+	res["definitions"]["serviceProcess"]["properties"]["status"]["type"]	= "string";
+	res["definitions"]["serviceSocket"]["type"]				= "object";
+	res["definitions"]["serviceSocket"]["properties"]["name"]["type"]	= "string";
+	res["definitions"]["serviceSocket"]["properties"]["status"]["type"]	= "string";
+	res["definitions"]["services"]["properties"]["process"]["type"]		= "array";
+	res["definitions"]["services"]["properties"]["process"]["items"]["type"]= "#/definitions/serviceProcess";
+	res["definitions"]["services"]["properties"]["sockets"]["type"]		= "array";
+	res["definitions"]["services"]["properties"]["sockets"]["items"]["type"]= "#/definitions/serviceSocket";
+	for (std::vector<service *>::iterator i=services.begin();i!=services.end();i++)
+		(*i)->getJson(&res);
 
 	wbuilder["indentation"] = "\t";
 	document = Json::writeString(wbuilder, res);

@@ -20,6 +20,7 @@ public:
 	void save();
 	Json::Value* 	getCollector(std::string p_name);
 	Json::Value* 	getServer() { return &(data["server"]); }
+	Json::Value* 	getPlugins() { return &(data["plugins"]); }
 	Json::Value* 	getAgent();
 private:
 	Json::Value	data;
@@ -36,6 +37,7 @@ public:
 	void startThreads();
 	void getJson(Json::Value* p_defs);
 	void getIndexHtml(std::stringstream& stream );
+private:
 	HttpServer* server;
 	Config *cfg;
 	std::map<std::string, Collector*>	collectors;
@@ -82,6 +84,7 @@ private:
 	std::vector<serviceDetector *>	detectors;
 	std::vector<serviceEnhancer *>	enhancers;
 	CollectorsManager*		systemCollectors;
+	std::thread 			my_thread;
 	HttpServer* server;
 	Config *cfg;
 };

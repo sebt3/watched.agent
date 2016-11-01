@@ -240,7 +240,7 @@ void CollectorsManager::getJson(Json::Value* p_defs) {
 
 
 CollectorsManager::CollectorsManager(HttpServer* p_server, Config* p_cfg) : server(p_server), cfg(p_cfg) {
-	Json::Value*	servCfg = cfg->getServer();
+	Json::Value*	servCfg = cfg->getPlugins();
 	// 1st : find and load the modules
 	map<string, collector_maker_t *, less<string> >::iterator factit;
 	DIR *dir;

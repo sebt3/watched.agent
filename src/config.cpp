@@ -28,14 +28,19 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 		data["server"]["port"] = 9080;
 		data["server"]["port"].setComment(std::string("/*\t\tTCP port number */"), Json::commentAfterOnSameLine);
 	}
-	if (! data["server"].isMember("services_cpp")) {
-		data["server"]["services_cpp"] = "services";
+
+	// plugins
+	if (! data.isMember("plugins") || ! data["plugins"].isMember("services_cpp")) {
+		data["plugins"]["services_cpp"] = "services";
+		data["plugins"]["services_cpp"].setComment(std::string("/*\t\tThe directory where the *.so services plugins are stored*/"), Json::commentAfterOnSameLine);
 	}
-	if (! data["server"].isMember("collectors_cpp")) {
-		data["server"]["collectors_cpp"] = "collectors";
+	if (! data["plugins"].isMember("collectors_cpp")) {
+		data["plugins"]["collectors_cpp"] = "collectors";
+		data["plugins"]["collectors_cpp"].setComment(std::string("/*\t\tThe directory where the *.so collector plugins are stored*/"), Json::commentAfterOnSameLine);
 	}
-	if (! data["server"].isMember("collectors_lua")) {
-		data["server"]["collectors_lua"] = "../luaCollectors";
+	if (! data["plugins"].isMember("collectors_lua")) {
+		data["plugins"]["collectors_lua"] = "../luaCollectors";
+		data["plugins"]["collectors_lua"].setComment(std::string("/*\t\tThe directory where the *.lua collector plugins are stored*/"), Json::commentAfterOnSameLine);
 	}
 }
 
