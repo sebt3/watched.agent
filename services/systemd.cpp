@@ -11,9 +11,9 @@ using namespace watcheD;
 
 class systemdDetector: public serviceDetector {
 public:
-	systemdDetector(servicesManager *p_sm, HttpServer* p_server):serviceDetector(p_sm, p_server) {}
+	systemdDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server):serviceDetector(p_sm, p_server) {}
 	void find() {
-		std::cout << "systemdDetector::find()\n";
+		//std::cout << "systemdDetector::find()\n";
 	}
 };
 MAKE_PLUGIN_DETECTOR(systemdDetector, systemd)
@@ -21,7 +21,7 @@ MAKE_PLUGIN_DETECTOR(systemdDetector, systemd)
 
 class systemdHandler: public serviceHandler {
 public:
-	systemdHandler(service* p_s):serviceHandler(p_s) {}
+	systemdHandler(std::shared_ptr<service> p_s):serviceHandler(p_s) {}
 	bool status() { return true; }
 	bool isBlackout() { return false; }
 };

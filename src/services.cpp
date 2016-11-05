@@ -123,38 +123,42 @@ bool process::getStatus() {
 /*********************************
  * Services
  */
-service::service(HttpServer* p_server): name(""), type("unknown"), cfg(Json::objectValue), handler(NULL), server(p_server) {
+service::service(std::shared_ptr<HttpServer> p_server): name(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), server(p_server) {
 }
 
-service::service(HttpServer* p_server, std::string p_file_path): name(""), type("unknown"), cfg(Json::objectValue), handler(NULL), cfgFile(p_file_path), server(p_server) {
+service::service(std::shared_ptr<HttpServer> p_server, std::string p_file_path): name(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), cfgFile(p_file_path), server(p_server) {
 	std::ifstream cfgif (cfgFile);
 	if (cfgif.good()) {
 		cfgif >> cfg;
 		cfgif.close();
 	}
-	if (cfg.isMember("process")) 
-		for (const Json::Value& line : cfg["process"])
-			addMainProcess(new process(line.asString()));
+	// sockets have to be loaded before process so the registered name is correct
 	if (cfg.isMember("sockets")) 
 		for (const Json::Value& line : cfg["sockets"])
-			setSocket(new socket(line.asString()));
+			setSocket(std::make_shared<socket>(line.asString()));
+	if (cfg.isMember("uniqName"))
+		uniqName = cfg["uniqName"].asString();
+	if (cfg.isMember("process")) 
+		for (const Json::Value& line : cfg["process"])
+			addMainProcess(std::make_shared<process>(line.asString()));
 }
 
 service::service(const service& p_src) {
 	// copy constructor
 	name	= p_src.name;
+	uniqName= p_src.uniqName;
 	type	= p_src.type;
 	cfg	= p_src.cfg;
 	server	= p_src.server;
 	cfgFile = p_src.cfgFile;
-	for(std::vector<socket *>::const_iterator i=p_src.sockets.begin();i!=p_src.sockets.end();i++)
+	for(std::vector< std::shared_ptr<socket> >::const_iterator i=p_src.sockets.begin();i!=p_src.sockets.end();i++)
 		sockets.push_back(*i);
-	for(std::vector<process *>::const_iterator i=p_src.mainProcess.begin();i!=p_src.mainProcess.end();i++)
+	for(std::vector< std::shared_ptr<process> >::const_iterator i=p_src.mainProcess.begin();i!=p_src.mainProcess.end();i++)
 		mainProcess.push_back(*i);
-	for(std::vector<Collector *>::const_iterator i=p_src.collectors.begin();i!=p_src.collectors.end();i++)
+	for(std::vector< std::shared_ptr<Collector> >::const_iterator i=p_src.collectors.begin();i!=p_src.collectors.end();i++)
 		collectors.push_back(*i);
 	if (mainProcess.size() > 0)
-		associate(server,"GET","^/service/"+name+"/status$",doGetStatus);
+		associate(server,"GET","^/service/"+name + "-" + uniqName+"/status$",doGetStatus);
 }
 void	service::setDefaultConfig() {
 	Json::Value arr(Json::arrayValue);
@@ -163,15 +167,16 @@ void	service::setDefaultConfig() {
 		cfg["sockets"] = arr;
 	else
 		cfg["sockets"].clear();
-	for(std::vector<socket *>::iterator i=sockets.begin();i!=sockets.end();i++)
+	for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++)
 		cfg["sockets"].append((*i)->getSource());
 
 	if (! cfg.isMember("process"))
 		cfg["process"] = arr;
 	else
 		cfg["process"].clear();
-	for(std::vector<process *>::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
+	for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
 		cfg["process"].append((*i)->getPath());
+	cfg["uniqName"] = uniqName;
 }
 void	service::saveConfigTemplate(std::string p_cfg_dir){
 	setDefaultConfig();
@@ -181,28 +186,33 @@ void	service::saveConfigTemplate(std::string p_cfg_dir){
 	cfgof.close();
 }
 
-void	service::setSocket(socket *p_sock) {
+void	service::setSocket(std::shared_ptr<socket> p_sock) {
+	if (sockets.size()==0 && uniqName=="") {
+		uniqName = p_sock->getSource();
+		uniqName.replace(uniqName.find(":"),3,"_");
+		uniqName.replace(uniqName.find(":"),1,"_");
+	}
 	sockets.push_back(p_sock);
 }
 
-void 	service::addMainProcess(process *p_p) { 
+void 	service::addMainProcess(std::shared_ptr<process> p_p) { 
 	if (mainProcess.size()==0)
 		name = p_p->getName();
 	mainProcess.push_back(p_p);
-	std::string tmp = name;
-	associate(server,"GET","^/service/"+tmp+"/status$",doGetStatus);
+	//std::string tmp = name + "-" + uniqName;
+	associate(server,"GET","^/service/"+name + "-" + uniqName+"/status$",doGetStatus);
 	
 	//TODO: detect sub processes (which have ppid=p_p)
 }
 
 bool	service::haveSocket(uint32_t p_socket_id) {
-	for (std::vector<process *>::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
+	for (std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
 		if ((*i)->haveSocket(p_socket_id)) return true;
 	return false;
 }
 
 bool	service::havePID(uint32_t p_pid) {
-	for (std::vector<process *>::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
+	for (std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
 		if ((*i)->getPID() == p_pid) return true;
 	return false;
 }
@@ -212,11 +222,11 @@ void	service::doGetStatus(response_ptr response, request_ptr request) {
 	std::stringstream ss;
 	Json::Value ret(Json::objectValue);
 	
-	int n=0;for(std::vector<socket *>::iterator i=sockets.begin();i!=sockets.end();i++,n++) {
+	int n=0;for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++,n++) {
 		ret["sockets"][n]["name"]   = (*i)->getSource();
 		ret["sockets"][n]["status"] = "ok"; // TODO actually support this for correct service monitoring
 	}
-	n=0;for(std::vector<process *>::iterator i=mainProcess.begin();i!=mainProcess.end();i++,n++) {
+	n=0;for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++,n++) {
 		ret["process"][n]["name"]   = (*i)->getName();
 		ret["process"][n]["status"] = "ok";
 		if (! (*i)->getStatus()) {
@@ -235,7 +245,7 @@ void	service::doGetStatus(response_ptr response, request_ptr request) {
 }
 
 void	service::getIndexHtml(std::stringstream& stream ) {
-	stream << "<h3><a href='/service/" << name <<"/status'>" << name << "(" << type << ")</a></h3>\n";
+	stream << "<h3><a href='/service/" << name << "-" << uniqName <<"/status'>" << name << " - " << uniqName << "(" << type << ")</a></h3>\n";
 }
 
 void	service::getJson(Json::Value* p_defs) {
@@ -246,7 +256,7 @@ void	service::getJson(Json::Value* p_defs) {
 }
 
 bool	service::haveSocket(std::string p_source) const {
-	for(std::vector<socket *>::const_iterator i=sockets.begin();i!=sockets.end();i++) {
+	for(std::vector< std::shared_ptr<socket> >::const_iterator i=sockets.begin();i!=sockets.end();i++) {
 		if ((*i)->getSource()  == p_source)
 			return true;
 	}
@@ -256,7 +266,7 @@ bool	service::haveSocket(std::string p_source) const {
 bool	service::operator==(const service& rhs) {
 	if (name != rhs.name) return false;
 	if (type != rhs.type) return false;
-	for(std::vector<socket *>::iterator i=sockets.begin();i!=sockets.end();i++) {
+	for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++) {
 		if (!rhs.haveSocket((*i)->getSource()))
 			return false;
 	}
@@ -264,12 +274,9 @@ bool	service::operator==(const service& rhs) {
 	return true;
 }
 
-void	service::updateFrom(service *src) {
-	while(!mainProcess.empty()) {
-		delete mainProcess.back();
-		mainProcess.pop_back();
-	}
-	for(std::vector<process *>::iterator i=src->mainProcess.begin();i!=src->mainProcess.end();i++)
+void	service::updateFrom(std::shared_ptr<service> src) {
+	mainProcess.clear();
+	for(std::vector< std::shared_ptr<process> >::iterator i=src->mainProcess.begin();i!=src->mainProcess.end();i++)
 		addMainProcess((*i));
 }
 
@@ -277,16 +284,17 @@ void	service::updateFrom(service *src) {
  * ServicesManager
  */
 namespace watcheD {
-std::map<std::string, detector_maker_t *> detectorFactory;
-std::map<std::string, enhancer_maker_t *> enhancerFactory;
-std::map<std::string,  handler_maker_t *>  handlerFactory;
-std::map<std::string,  service_maker_t *>  serviceFactory;
+std::map<std::string, detector_maker_t* > detectorFactory;
+std::map<std::string, enhancer_maker_t* > enhancerFactory;
+std::map<std::string, handler_maker_t*  >  handlerFactory;
+std::map<std::string, service_maker_t*  >  serviceFactory;
 }
 
-servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p_server), cfg(p_cfg) {
+servicesManager::servicesManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg) : active(false), server(p_server), cfg(p_cfg) {}
+void servicesManager::init() {
 	Json::Value*		servCfg	  = cfg->getPlugins();
 	DIR *			dir;
-	std::string		directory = (*servCfg)["services_conf"].asString();
+	std::string		directory = (*cfg->getServices())["config_dir"].asString();
 	class dirent*		ent;
 	class stat 		st;
 	void*			dlib;
@@ -306,12 +314,11 @@ servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p
 			continue;
 
 		if (file_name.substr(file_name.rfind(".")) == ".json") {
-			services.push_back(new service(server, full_file_name));
+			services.push_back(std::make_shared<service>(server, full_file_name));
 		}
 	}
 	closedir(dir);
-	
-	
+
 	// Load the services plugins
 	directory = (*servCfg)["services_cpp"].asString();
 	dir = opendir(directory.c_str());
@@ -339,15 +346,15 @@ servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p
 	closedir(dir);
 	
 	// Instanciate the detector classes
-	for(std::map<std::string, detector_maker_t *>::iterator factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
-		detectors.push_back(factit->second(this, server));
+	for(std::map<std::string, detector_maker_t* >::iterator factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
+		detectors.push_back(factit->second(shared_from_this(), server));
 
 	// then the enhancer
-	for(std::map<std::string, enhancer_maker_t *>::iterator factit = enhancerFactory.begin();factit != enhancerFactory.end(); factit++)
-		enhancers.push_back(factit->second(this));
+	for(std::map<std::string, enhancer_maker_t* >::iterator factit = enhancerFactory.begin();factit != enhancerFactory.end(); factit++)
+		enhancers.push_back(factit->second(shared_from_this()));
 
-	detectors.push_back(new socketDetector(this, server));
-	systemCollectors	= new CollectorsManager(server,cfg);
+	detectors.push_back(std::make_shared<socketDetector>(shared_from_this(), server));
+	systemCollectors	= std::make_shared<CollectorsManager>(server,cfg);
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	associate(server,"GET","^/$",doGetRootPage);
 	associate(server,"GET","^/api/swagger.json$",doGetJson);
@@ -355,19 +362,24 @@ servicesManager::servicesManager(HttpServer *p_server, Config* p_cfg) : server(p
 
 void servicesManager::startThreads() {
 	systemCollectors->startThreads();
-	find();
+	active = true;
 	my_thread = std::thread ([this]() {
-		std::this_thread::sleep_for(std::chrono::seconds(10));
-		find();
+		Json::Value*		servCfg	  = cfg->getServices();
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		do {
+			find();
+			std::this_thread::sleep_for(std::chrono::seconds((*servCfg)["find_frequency"].asInt()));
+		} while (active);
+		
 	});
 
 }
 
-void servicesManager::addService(service *p_serv) {
-	service *add = p_serv;
+void servicesManager::addService(std::shared_ptr<service> p_serv) {
+	std::shared_ptr<service> add = p_serv;
 	// try to improve the service
-	for(std::vector<serviceEnhancer *>::iterator i=enhancers.begin();i!=enhancers.end();i++) {
-		service *s = (*i)->enhance(p_serv);
+	for(std::vector<std::shared_ptr<serviceEnhancer> >::iterator i=enhancers.begin();i!=enhancers.end();i++) {
+		std::shared_ptr<service> s = (*i)->enhance(p_serv);
 		if (s!=NULL) {
 			add=s;
 			break;
@@ -375,35 +387,33 @@ void servicesManager::addService(service *p_serv) {
 	}
 
 	// Detect if the service isnt already known
-	for (std::vector<service *>::iterator i=services.begin();i!=services.end();i++){
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++){
 		if ( *(*i) == *add ) {
 			(*i)->updateFrom(add);
-			delete add;
+			//delete add;
 			return;
 		}
 	}
-	// reload the server to enable the new URLs
-	server->reload();
 	// save the template config
-	Json::Value*		servCfg	  = cfg->getPlugins();
-	add->saveConfigTemplate((*servCfg)["services_conf"].asString());
+	Json::Value*		servCfg	  = cfg->getServices();
+	add->saveConfigTemplate((*servCfg)["config_dir"].asString());
 	// adding the service to the list
 	services.push_back(add);
 }
 
 void servicesManager::find() {
-	for (std::vector<serviceDetector *>::iterator i=detectors.begin();i!=detectors.end();i++)
+	for (std::vector< std::shared_ptr<serviceDetector> >::iterator i=detectors.begin();i!=detectors.end();i++)
 		(*i)->find();
 }
 
 bool	servicesManager::haveSocket(uint32_t p_socket_id) {
-	for (std::vector<service *>::iterator i=services.begin();i!=services.end();i++)
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++)
 		if ((*i)->haveSocket(p_socket_id)) return true;
 	return false;
 }
 
-service *servicesManager::enhanceFromFactory(std::string p_id, service *p_serv) {
-	for(std::map<std::string, service_maker_t *>::iterator i=serviceFactory.begin();i!=serviceFactory.end();i++) {
+std::shared_ptr<service> servicesManager::enhanceFromFactory(std::string p_id, std::shared_ptr<service> p_serv) {
+	for(std::map<std::string, service_maker_t* >::iterator i=serviceFactory.begin();i!=serviceFactory.end();i++) {
 		if (i->first == p_id)
 			return i->second(*p_serv);
 	}
@@ -411,7 +421,7 @@ service *servicesManager::enhanceFromFactory(std::string p_id, service *p_serv) 
 }
 
 bool	servicesManager::havePID(uint32_t p_pid) {
-	for (std::vector<service *>::iterator i=services.begin();i!=services.end();i++)
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++)
 		if ((*i)->havePID(p_pid)) return true;
 	return false;
 }
@@ -420,7 +430,7 @@ void servicesManager::doGetRootPage(response_ptr response, request_ptr request) 
 	std::stringstream stream;
         stream << "<html><head><title>" << APPS_NAME.c_str() << "</title>\n";
 	stream << "</head><body><table width=100%><tr><td><h1>Services</h1>\n";
-	for (std::vector<service *>::iterator i=services.begin();i!=services.end();i++)
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++)
 		(*i)->getIndexHtml(stream);
 
 	stream << "</td><td><h1>System</h1>\n";
@@ -469,7 +479,7 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 	res["definitions"]["services"]["properties"]["process"]["items"]["type"]= "#/definitions/serviceProcess";
 	res["definitions"]["services"]["properties"]["sockets"]["type"]		= "array";
 	res["definitions"]["services"]["properties"]["sockets"]["items"]["type"]= "#/definitions/serviceSocket";
-	for (std::vector<service *>::iterator i=services.begin();i!=services.end();i++)
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++)
 		(*i)->getJson(&res);
 
 	wbuilder["indentation"] = "\t";
@@ -486,19 +496,21 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 void socketDetector::find(void) {
 	//TODO: add suport for ipv6 sockets
 
+	std::shared_ptr<servicesManager> mgr = services.lock();
+	if (!mgr) return;
 	// find all LISTEN TCP sockets
 	std::ifstream infile("/proc/net/tcp");
 	std::string line;
-	std::vector<socket*> sockets;
+	std::vector< std::shared_ptr<socket> > sockets;
 	while(infile.good() && getline(infile, line)) {
 		std::istringstream iss(line);
 		std::istream_iterator<std::string> beg(iss), end;
 		std::vector<std::string> tokens(beg,end);
 		if (tokens[3] != "0A")
 			continue; // keep only listening sockets
-		if (services->haveSocket(atoi(tokens[9].c_str())))
+		if (mgr->haveSocket(atoi(tokens[9].c_str())))
 			continue; // socket already associated to a service
-		sockets.push_back(new socket(line, "tcp"));
+		sockets.push_back(std::make_shared<socket>(line, "tcp"));
 	}
 	if (infile.good())
 		infile.close();
@@ -511,7 +523,7 @@ void socketDetector::find(void) {
 		std::vector<std::string> tokens(beg,end);
 		if (tokens[3] != "07")
 			continue;
-		sockets.push_back(new socket(line, "udp"));
+		sockets.push_back(std::make_shared<socket>(line, "udp"));
 	}
 	if (unfile.good())
 		unfile.close();
@@ -521,44 +533,34 @@ void socketDetector::find(void) {
 	// find all processes
 	DIR *dir;
 	struct dirent *ent;
-	std::vector<process *> processes;
+	std::vector< std::shared_ptr<process> > processes;
 	std::string file;
-	process *p;
-	bool found;
 	if ((dir = opendir ("/proc/")) == NULL) return;
 	while ((ent = readdir (dir)) != NULL) {
 		file = ent->d_name;
 		if (!std::all_of(file.begin(), file.end(), ::isdigit)) continue;
-		if (services->havePID(atoi(file.c_str())))
+		if (mgr->havePID(atoi(file.c_str())))
 			continue; // process already associated to a service
-		p = new process(atoi(file.c_str()));
+		std::shared_ptr<process> p = std::make_shared<process>(atoi(file.c_str()));
 		p->setSockets();
-		found = false;
-		for(std::vector<socket*>::iterator it = sockets.begin(); it != sockets.end(); ++it) {
+		for(std::vector< std::shared_ptr<socket> >::iterator it = sockets.begin(); it != sockets.end(); ++it) {
 			if (!p->haveSocket((*it)->getID())) continue;
 			// service found
-			service *serv = new service(server);
-			serv->addMainProcess(p);
+			std::shared_ptr<service> serv = std::make_shared<service>(server);
 			serv->setSocket(*it);
+			serv->addMainProcess(p);
 			// remove the now associated socket from the list
-			sockets.erase(it);
+			it = sockets.erase(it);
 			// trying to associate more sockets to this service
-			for(std::vector<socket*>::iterator i = sockets.begin(); i != sockets.end(); ) {
+			for(std::vector< std::shared_ptr<socket> >::iterator i = sockets.begin(); i != sockets.end(); ) {
 				if (!serv->haveSocket((*i)->getID())) {++i;continue; }
 				serv->setSocket(*i);
 				i = sockets.erase(i);
 			}
-			services->addService(serv);
-			found = true;
+			mgr->addService(serv);
 			break;
 		}
-		// free unused process
-		if(!found) delete p;
 	}
 	closedir (dir);
 	// TODO: do something with the non-matching sockets too
-
-	// cleaning non-matching sockets
-	for(std::vector<socket*>::iterator i=sockets.begin();i!=sockets.end();i++)
-		delete *i;
 }

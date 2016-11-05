@@ -85,7 +85,7 @@ void Ressource::getDefinition(Json::Value* p_defs) {
  * Collector
  */
 
-Collector::Collector(string p_name, HttpServer* p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), type("system"), active(false),  server(p_server) {
+Collector::Collector(string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), type("system"), active(false),  server(p_server) {
 	if(! cfg->isMember("history") && p_history>0) {
 		(*cfg)["history"] = p_history;
 		(*cfg)["history"].setComment(std::string("/*\t\tNumber of elements to keep*/"), Json::commentAfterOnSameLine);
@@ -118,9 +118,9 @@ void Collector::startThread() {
 	}
 }
 void Collector::addRessource(string p_name, string p_desc, std::string p_typeName) {
-	map<string, Ressource*>::const_iterator it = ressources.find(p_name);
+	map<string, std::shared_ptr<Ressource> >::const_iterator it = ressources.find(p_name);
 	if( it == ressources.end()) {
-		ressources[p_name]	= new Ressource((*cfg)["history"].asUInt(), p_typeName);
+		ressources[p_name]	= std::make_shared<Ressource>((*cfg)["history"].asUInt(), p_typeName);
 		desc[p_name]		= p_desc;
 	}
 }
@@ -134,7 +134,7 @@ void Collector::addGetMetricRoute() {
 void Collector::getDefinitions(Json::Value* p_defs) {
 	Json::Value data(Json::objectValue);
 	if ((*cfg)["enable"].asBool()) {
-		for(map<string, Ressource*>::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+		for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
 			if (! p_defs->isMember(i->second->typeName))
 				(*p_defs)[i->second->typeName] = data;
 			i->second->getDefinition( &((*p_defs)[i->second->typeName]) );
@@ -144,7 +144,7 @@ void Collector::getDefinitions(Json::Value* p_defs) {
 
 void Collector::getPaths(Json::Value* p_defs) {
 	if ((*cfg)["enable"].asBool()) {
-		for(map<string, Ressource*>::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+		for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
 			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["summary"] = desc[i->first];
 			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["name"] = "len";
 			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["in"] = "query";
@@ -163,7 +163,7 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
 	string str;
 	const char* name_c  = name.c_str();
 
-	map<string, Ressource*>::const_iterator it = ressources.find(id);
+	map<string, std::shared_ptr<Ressource> >::const_iterator it = ressources.find(id);
 	if( it == ressources.end()) {
 		setResponse404(response, "No such Metric");
 		return;
@@ -197,7 +197,7 @@ void Collector::doGetHistory(response_ptr response, request_ptr request) {
         /*if (request.query().has("since"))
 		since= stod(request.query().get("since").get());*/
 
-	map<string, Ressource*>::const_iterator it = ressources.find(name);
+	map<string, std::shared_ptr<Ressource> >::const_iterator it = ressources.find(name);
 	if( it == ressources.end()) {
 		setResponse404(response, "No such Metric");
 		return;
@@ -208,7 +208,7 @@ void Collector::doGetHistory(response_ptr response, request_ptr request) {
 void Collector::getIndexHtml(std::stringstream& stream ){
 	if ((*cfg)["enable"].asBool()) {
 		stream << "<h3>" << name.c_str() << "</h3><ul>\n";
-		for(map<string, Ressource*>::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+		for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
 			stream << "<li><a href=\"/"+type+"/" << name.c_str() << "/" << i->first.c_str() << "/graph\">" << desc[i->first].c_str() << "</a></li>\n";
 		}
 		stream << "</ul>\n";
@@ -226,20 +226,20 @@ map<string, collector_maker_t *> collectorFactory;
 
 
 void CollectorsManager::getIndexHtml(std::stringstream& stream ) {
-	for(std::map<std::string, Collector*>::iterator i = collectors.begin();i != collectors.end();i++) {
+	for(std::map<std::string, std::shared_ptr<Collector> >::iterator i = collectors.begin();i != collectors.end();i++) {
 		i->second->getIndexHtml(stream);
 	} 
 }
 void CollectorsManager::getJson(Json::Value* p_defs) {
 	int cnt = 0;
-	for(std::map<std::string, Collector*>::iterator i = collectors.begin();i != collectors.end();i++,cnt++) {
+	for(std::map<std::string, std::shared_ptr<Collector> >::iterator i = collectors.begin();i != collectors.end();i++,cnt++) {
 		i->second->getDefinitions(&((*p_defs)["definitions"]));
 		i->second->getPaths(&((*p_defs)["paths"]));
 	}
 }
 
 
-CollectorsManager::CollectorsManager(HttpServer* p_server, Config* p_cfg) : server(p_server), cfg(p_cfg) {
+CollectorsManager::CollectorsManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg) : server(p_server), cfg(p_cfg) {
 	Json::Value*	servCfg = cfg->getPlugins();
 	// 1st : find and load the modules
 	map<string, collector_maker_t *, less<string> >::iterator factit;
@@ -296,14 +296,14 @@ CollectorsManager::CollectorsManager(HttpServer* p_server, Config* p_cfg) : serv
 
 
 		if (file_name.substr(file_name.rfind(".")) == ".lua") {
-			collectors[name] = new LuaCollector(server, cfg->getCollector(name), full_file_name);
+			collectors[name] = std::make_shared<LuaCollector>(server, cfg->getCollector(name), full_file_name);
 		}
 	}
 	closedir(dir);
 }
 
 void CollectorsManager::startThreads() {
-	for(std::map<std::string, Collector*>::iterator i = collectors.begin();i != collectors.end();i++)
+	for(std::map<std::string, std::shared_ptr<Collector> >::iterator i = collectors.begin();i != collectors.end();i++)
 		i->second->startThread();
 }
 

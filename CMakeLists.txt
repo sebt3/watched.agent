@@ -93,6 +93,7 @@ add_executable(watched.agent ${AGT_SOURCE_FILES} ${PROJECT_BINARY_DIR}/agent.con
 target_link_libraries(watched.agent dl ${JSONCPP_LIBRARIES} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${LUA_LIBRARIES})
 install(TARGETS watched.agent DESTINATION sbin COMPONENT binaries)
 install(FILES ${PROJECT_BINARY_DIR}/agent.config.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched COMPONENT config)
+install(DIRECTORY DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched/services)
 
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/collectors)

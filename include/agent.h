@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include "services.h"
 #include "selene.h"
 
@@ -20,6 +21,7 @@ public:
 	void save();
 	Json::Value* 	getCollector(std::string p_name);
 	Json::Value* 	getServer() { return &(data["server"]); }
+	Json::Value* 	getServices() { return &(data["services"]); }
 	Json::Value* 	getPlugins() { return &(data["plugins"]); }
 	Json::Value* 	getAgent();
 private:
@@ -32,15 +34,15 @@ private:
  */
 class CollectorsManager {
 public:
-	CollectorsManager(HttpServer *p_server, Config* p_cfg);
+	CollectorsManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg);
 	~CollectorsManager();
 	void startThreads();
 	void getJson(Json::Value* p_defs);
 	void getIndexHtml(std::stringstream& stream );
 private:
-	HttpServer* server;
-	Config *cfg;
-	std::map<std::string, Collector*>	collectors;
+	std::shared_ptr<HttpServer> server;
+	std::shared_ptr<Config> cfg;
+	std::map<std::string, std::shared_ptr<Collector> >	collectors;
 }; 
 
 /*********************************
@@ -48,7 +50,7 @@ private:
  */
 class LuaCollector : public Collector {
 public:
-	LuaCollector(HttpServer* p_srv, Json::Value* p_cfg, const std::string p_fname);
+	LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, const std::string p_fname);
 
 	void collect();
 	void addRes(std::string p_name, std::string p_desc, std::string p_typeName);
@@ -57,7 +59,6 @@ public:
 	void setProp(std::string p_res, std::string p_name, int val);
 	void setPropD(std::string p_res, std::string p_name, double val);
 	std::string getName(){ return name; }
-	
 private:
 	sel::State state{true};
 };
@@ -68,25 +69,27 @@ private:
  */
 //TODO: plugins should be able to be written in lua
 
-class servicesManager {
+class servicesManager : public std::enable_shared_from_this<servicesManager> {
 public:
-	servicesManager(HttpServer *p_server, Config* p_cfg);
+	servicesManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg);
+	void	init();
 	void	find();
-	void	addService(service *p_serv);
+	void	addService(std::shared_ptr<service> p_serv);
 	bool	haveSocket(uint32_t p_socket_id);
 	bool	havePID(uint32_t p_pid);
 	void	doGetJson(response_ptr response, request_ptr request);
 	void	doGetRootPage(response_ptr response, request_ptr request);
 	void	startThreads();
-	service *enhanceFromFactory(std::string p_id, service *p_serv);
+	std::shared_ptr<service> enhanceFromFactory(std::string p_id, std::shared_ptr<service> p_serv);
 private:
-	std::vector<service *>		services;
-	std::vector<serviceDetector *>	detectors;
-	std::vector<serviceEnhancer *>	enhancers;
-	CollectorsManager*		systemCollectors;
-	std::thread 			my_thread;
-	HttpServer* server;
-	Config *cfg;
+	std::vector< std::shared_ptr<service> >		services;
+	std::vector< std::shared_ptr<serviceDetector> >	detectors;
+	std::vector< std::shared_ptr<serviceEnhancer> >	enhancers;
+	std::shared_ptr<CollectorsManager>		systemCollectors;
+	std::thread 					my_thread;
+	bool						active;
+	std::shared_ptr<HttpServer> 			server;
+	std::shared_ptr<Config> 			cfg;
 };
 
 
@@ -95,7 +98,7 @@ private:
  */
 class socketDetector: public serviceDetector {
 public:
-	socketDetector(servicesManager *p_sm, HttpServer* p_server):serviceDetector(p_sm, p_server) {}
+	socketDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server):serviceDetector(p_sm, p_server) {}
 	void find();
 };
 

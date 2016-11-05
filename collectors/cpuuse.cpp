@@ -52,7 +52,7 @@ private:
 
 class CpuUseCollector : public Collector {
 public:
-	CpuUseCollector(HttpServer* p_srv, Json::Value* p_cfg) : Collector("cpuuse", p_srv, p_cfg) {
+	CpuUseCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("cpuuse", p_srv, p_cfg) {
 		string		line;
 		string		id;
 		ifstream	infile("/proc/stat");
@@ -60,14 +60,14 @@ public:
 			if (line.substr(0, 3) == "cpu") {
 				if (line.substr(0, 4) == "cpu ")	id = "all";
 				else					id = line.substr(3, line.find(" ")-3);
-				ressources[id]	= new cpuTicks((*cfg)["history"].asUInt());
+				ressources[id]	= std::make_shared<cpuTicks>((*cfg)["history"].asUInt());
 				desc[id]	= "CPU "+id+" usage";
 			} else if (line.substr(0, 4) == "intr") {
-				ressources["intr"]	= new tickRessource((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt(), "cpu_interrupts");
+				ressources["intr"]	= std::make_shared<tickRessource>((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt(), "cpu_interrupts");
 				desc["intr"]		= "Interrupts (#/s)";
 				ressources["intr"]->addProperty("value",   "Interrupts", "number");
 			} else if (line.substr(0, 4) == "ctxt") {
-				ressources["ctxt"]	= new tickRessource((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt(), "cpu_contexts");
+				ressources["ctxt"]	= std::make_shared<tickRessource>((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt(), "cpu_contexts");
 				desc["ctxt"]		= "Context switches (#/s)";
 				ressources["ctxt"]->addProperty("value",   "Context switches", "number");
 			}
@@ -83,8 +83,8 @@ public:
 		string		values;
 		string		id = "";
 		ifstream	infile("/proc/stat");
-		cpuTicks*	res;
-		tickRessource*	tres;
+		std::shared_ptr<cpuTicks>	res;
+		std::shared_ptr<tickRessource>	tres;
 		while(infile.good() && getline(infile, line)) {
 			if (line.substr(0, 3) == "cpu") {
 				istringstream iss(line);
@@ -92,14 +92,14 @@ public:
 				if (line.substr(0, 4) == "cpu ")	id = "all";
 				else					id = line.substr(3, line.find(" ")-3);
 				ressources[id]->nextValue();
-				res = reinterpret_cast<cpuTicks*>(ressources[id]);
+				res = reinterpret_cast<std::shared_ptr<cpuTicks>&>(ressources[id]);
 				res->setRaw(tokens);
 			} else if (line.substr(0, 4) == "intr") {
-				tres = reinterpret_cast<tickRessource*>(ressources["intr"]);
+				tres = reinterpret_cast<std::shared_ptr<tickRessource>&>(ressources["intr"]);
 				tres->nextValue();
 				tres->setTickValue("value", atoi(line.substr(5, line.find(" ",5)-5).c_str()));
 			} else if (line.substr(0, 4) == "ctxt") {
-				tres = reinterpret_cast<tickRessource*>(ressources["ctxt"]);
+				tres = reinterpret_cast<std::shared_ptr<tickRessource>&>(ressources["ctxt"]);
 				tres->nextValue();
 				tres->setTickValue("value", atoi(line.substr(5, line.find(" ",5)-5).c_str()));
 			}

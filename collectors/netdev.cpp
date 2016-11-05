@@ -38,7 +38,7 @@ public:
 
 class NetDevCollector : public Collector {
 public:
-	NetDevCollector(HttpServer* p_srv, Json::Value* p_cfg) : Collector("netdev", p_srv, p_cfg) {
+	NetDevCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("netdev", p_srv, p_cfg) {
 		addGetMetricRoute();
 	}
 
@@ -47,7 +47,7 @@ public:
 		string		values;
 		string		id = "";
 		ifstream	infile("/proc/net/dev");
-		netDevRess*	res;
+		std::shared_ptr<netDevRess>	res;
 		while(infile.good() && getline(infile, line)) {
 			if (line.find(":") >= line.size()) continue;
 			int endid = line.find(":");
@@ -56,11 +56,11 @@ public:
 			istringstream iss(line.substr(endid+1, line.length()));
 			vector<string> tokens{istream_iterator<string>{iss}, istream_iterator<string>{}};
 			if (ressources.find(id) == ressources.end()) {
-				res = new netDevRess((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt());;
+				res = std::make_shared<netDevRess>((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt());;
 				ressources[id]	= res;
 				desc[id]	= "Network interface "+id+" usage";
 			}else
-				res = reinterpret_cast<netDevRess*>(ressources[id]);
+				res = reinterpret_cast<std::shared_ptr<netDevRess>&>(ressources[id]);
 			ressources[id]->nextValue();
 			res->setRaw(tokens);
 		}

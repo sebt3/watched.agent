@@ -40,7 +40,7 @@ public:
 
 class diskStatsCollector : public Collector {
 public:
-	diskStatsCollector(HttpServer* p_srv, Json::Value* p_cfg) : Collector("diskstats", p_srv, p_cfg) {
+	diskStatsCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("diskstats", p_srv, p_cfg) {
 		addGetMetricRoute();
 	}
 
@@ -48,17 +48,17 @@ public:
 		string		line;
 		string		values;
 		ifstream	infile("/proc/diskstats");
-		diskStatsRess*	res;
+		std::shared_ptr<diskStatsRess>	res;
 		while(infile.good() && getline(infile, line)) {
 			istringstream iss(line);
 			vector<string> tokens{istream_iterator<string>{iss}, istream_iterator<string>{}};
 			if(tokens[2].substr(0,3) == "dm-") continue;
 			if (ressources.find(tokens[2]) == ressources.end()) {
-				res = new diskStatsRess((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt());
+				res = std::make_shared<diskStatsRess>((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt());
 				ressources[tokens[2]] = res;
 				desc[tokens[2]] = "Disk "+tokens[2]+" statistics";
 			}else
-				res = reinterpret_cast<diskStatsRess*>(ressources[tokens[2]]);
+				res = reinterpret_cast<std::shared_ptr<diskStatsRess>&>(ressources[tokens[2]]);
 
 			ressources[tokens[2]]->nextValue();
 			res->setRaw(tokens);

@@ -3,7 +3,7 @@
 using namespace watcheD;
 using namespace sel;
 
-LuaCollector::LuaCollector(HttpServer* p_srv, Json::Value* p_cfg, const std::string p_fname): Collector("lua", p_srv, p_cfg, 0, 0) {
+LuaCollector::LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, const std::string p_fname): Collector("lua", p_srv, p_cfg, 0, 0) {
 	state.Load(p_fname);
 	if(! cfg->isMember("history")) (*cfg)["history"] = (int)state["cfg"]["history"];
 	if(! cfg->isMember("poll-frequency")) (*cfg)["poll-frequency"] = (int)state["cfg"]["poolfreq"];

@@ -8,7 +8,7 @@ using namespace watcheD;
 
 class MemoryCollector : public Collector {
 public:
-	MemoryCollector(HttpServer* p_srv, Json::Value* p_cfg) : Collector("memory", p_srv, p_cfg, 150, 10) {
+	MemoryCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("memory", p_srv, p_cfg, 150, 10) {
 		string		line;
 		string		id;
 		ifstream	infile("/proc/meminfo");

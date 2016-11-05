@@ -12,11 +12,11 @@ using namespace watcheD;
 
 class vmStatCollector : public Collector {
 public:
-	vmStatCollector(HttpServer* p_srv, Json::Value* p_cfg) : Collector("vmstat", p_srv, p_cfg) {
+	vmStatCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("vmstat", p_srv, p_cfg) {
 		string		line;
 		string		id;
 		ifstream	infile("/proc/vmstat");
-		tickRessource* 	res	= new tickRessource((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt(), "memory_stats");
+		std::shared_ptr<tickRessource> 	res	= std::make_shared<tickRessource>((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt(), "memory_stats");
 		ressources["stat"]	= res;
 		desc["stat"]		= "Memory usage statistics";
 		while(infile.good() && getline(infile, line)) {
@@ -48,7 +48,7 @@ public:
 		string		line;
 		string		id = "";
 		ifstream	infile("/proc/vmstat");
-		tickRessource*	res = reinterpret_cast<tickRessource*>(ressources["stat"]);
+		std::shared_ptr<tickRessource>	res = reinterpret_cast<std::shared_ptr<tickRessource>&>(ressources["stat"]);
 		res->nextValue();
 		while(infile.good() && getline(infile, line)) {
 			id = line.substr(0,line.find(" "));

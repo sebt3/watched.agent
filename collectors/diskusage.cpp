@@ -49,6 +49,7 @@ public:
 		addProperty("ipctfree",  "Free inode %", "number");
 	}
 	void setStats(struct statvfs *p_stats) {
+		nextValue();
 		setProperty("size", p_stats->f_bsize*p_stats->f_blocks/(1024*1024));
 		setProperty("free", p_stats->f_bsize*p_stats->f_bavail/(1024*1024));
 		setProperty("pctfree", (double)(p_stats->f_bavail*100)/p_stats->f_blocks);
@@ -58,7 +59,7 @@ public:
 
 class diskUsageCollector : public Collector {
 public:
-	diskUsageCollector(HttpServer* p_srv, Json::Value* p_cfg) : Collector("diskusage", p_srv, p_cfg, 100, 300) {
+	diskUsageCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("diskusage", p_srv, p_cfg, 100, 300) {
 		addGetMetricRoute();
 	}
 
@@ -68,7 +69,7 @@ public:
 		struct statvfs stats;
 		
 		string id;
-		diskUsageRess* res;
+		std::shared_ptr<diskUsageRess> res;
 
 		if ( ( fh = setmntent( "/etc/mtab", "r" ) ) == NULL ) {
 			cerr << "Cannot open \'/etc/mtab\'!\n";
@@ -83,13 +84,12 @@ public:
 
 			id = url_encode(mnt_info->mnt_dir);
 			if (ressources.find(id) == ressources.end()) {
-				res = new diskUsageRess((*cfg)["history"].asUInt());
+				res = std::make_shared<diskUsageRess>((*cfg)["history"].asUInt());
 				ressources[id] = res;
 				desc[id] = mnt_info->mnt_dir;
 				desc[id]+= " disk usage";
 			}else
-				res = reinterpret_cast<diskUsageRess*>(ressources[id]);
-			res->nextValue();
+				res = reinterpret_cast<std::shared_ptr<diskUsageRess>&>(ressources[id]);
 			res->setStats(&stats);
 		}
 		endmntent( fh );

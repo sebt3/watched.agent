@@ -29,14 +29,20 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 		data["server"]["port"].setComment(std::string("/*\t\tTCP port number */"), Json::commentAfterOnSameLine);
 	}
 
+	// services
+	if (! data.isMember("services") || ! data["services"].isMember("config_dir")) {
+		data["services"]["config_dir"] = "cfgs";
+		data["services"]["config_dir"].setComment(std::string("/*\t\tThe directory where the *.json service configuration files are stored*/"), Json::commentAfterOnSameLine);
+	}
+	if (! data["services"].isMember("find_frequency")) {
+		data["services"]["find_frequency"] = 120;
+		data["services"]["find_frequency"].setComment(std::string("/*\t\t\t\tThe frequency (in sec)  to pool for new (or restarted) services*/"), Json::commentAfterOnSameLine);
+	}
+
 	// plugins
 	if (! data.isMember("plugins") || ! data["plugins"].isMember("services_cpp")) {
 		data["plugins"]["services_cpp"] = "services";
 		data["plugins"]["services_cpp"].setComment(std::string("/*\t\tThe directory where the *.so services plugins are stored*/"), Json::commentAfterOnSameLine);
-	}
-	if (! data["plugins"].isMember("services_conf")) {
-		data["plugins"]["services_conf"] = "cfgs";
-		data["plugins"]["services_conf"].setComment(std::string("/*\t\tThe directory where the *.json service configuration files are stored*/"), Json::commentAfterOnSameLine);
 	}
 	if (! data["plugins"].isMember("collectors_cpp")) {
 		data["plugins"]["collectors_cpp"] = "collectors";

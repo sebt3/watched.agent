@@ -12,13 +12,13 @@ const std::string APPS_DESC="Watch over wasted being washed up";
 #include "config.h"
 
 
-void default_resource_send(const HttpServer &server, std::shared_ptr<HttpServer::Response> response,
+void default_resource_send(std::shared_ptr<HttpServer> server, std::shared_ptr<HttpServer::Response> response,
                            std::shared_ptr<std::ifstream> ifs, std::shared_ptr<std::vector<char> > buffer) {
 	std::streamsize read_length;
 	if((read_length=ifs->read(&(*buffer)[0], buffer->size()).gcount())>0) {
 		response->write(&(*buffer)[0], read_length);
 		if(read_length==static_cast<std::streamsize>(buffer->size())) {
-			server.send(response, [&server, response, ifs, buffer](const boost::system::error_code &ec) {
+			server->send(response, [&server, response, ifs, buffer](const boost::system::error_code &ec) {
 				if(!ec)
 					default_resource_send(server, response, ifs, buffer);
 				else
@@ -31,14 +31,14 @@ void default_resource_send(const HttpServer &server, std::shared_ptr<HttpServer:
 int main(int argc, char *argv[]) {
 	std::string cfgfile = WATCHED_CONFIG;
 	if (argc>1) cfgfile = argv[1];
-	Config cfg(cfgfile);
-	Json::Value*	servCfg = cfg.getServer();
+	std::shared_ptr<Config> cfg = std::make_shared<Config>(cfgfile);
+	Json::Value*	servCfg = cfg->getServer();
 	int port_i	= (*servCfg)["port"].asInt();
 
-	HttpServer server(port_i, 1);
-	server.config.address  = (*servCfg)["host"].asString();
+	std::shared_ptr<HttpServer> server = std::make_shared<HttpServer>(port_i, 1);
+	server->config.address  = (*servCfg)["host"].asString();
 	
-	server.default_resource["GET"]=[&server](std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request) {
+	server->default_resource["GET"]=[server](std::shared_ptr<HttpServer::Response> response, std::shared_ptr<HttpServer::Request> request) {
 		try {
 			auto web_root_path=boost::filesystem::canonical("web");
 			auto path=boost::filesystem::canonical(web_root_path/request->path);
@@ -76,11 +76,12 @@ int main(int argc, char *argv[]) {
 		}
 	};
 
-	servicesManager *sm = new servicesManager(&server,&cfg);
-	cfg.save();
+	std::shared_ptr<servicesManager> sm = std::make_shared<servicesManager>(server,cfg);
+	sm->init();
+	cfg->save();
 
 	sm->startThreads();
-	server.start();
+	server->start();
 
 	return 0;
 }
