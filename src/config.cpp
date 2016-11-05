@@ -4,7 +4,7 @@
 #include <fstream>
 
 using namespace std;
-using namespace watcheD;
+namespace watcheD {
 
 
 Config::Config(std::string p_fname) : fname(p_fname) {
@@ -78,4 +78,6 @@ Json::Value* 	Config::getAgent() {
 		data["agent"].setComment(std::string("/*\tRemote agent specific configuration */"), Json::commentBefore);
 	}
 	return &(data["agent"]); 
+}
+
 }

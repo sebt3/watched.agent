@@ -8,7 +8,6 @@
 #include <unistd.h> 
 
 using namespace std;
-using namespace watcheD;
 
 namespace watcheD {
 
@@ -20,7 +19,6 @@ void setResponseHtml(response_ptr response, std::string content) {
 }
 void setResponseJson(response_ptr response, std::string content) {
 	*response << "HTTP/1.1 200 OK\r\nServer: watched.agent\r\nContent-Type:application/json\r\nAccess-Control-Allow-Origin:*\r\nContent-Length: " << content.length() << "\r\n\r\n" << content;
-}
 }
 
 /*********************************
@@ -220,10 +218,7 @@ void Collector::getIndexHtml(std::stringstream& stream ){
  * CollectorsManager
  */
 
-namespace watcheD {
 map<string, collector_maker_t *> collectorFactory;
-}
-
 
 void CollectorsManager::getIndexHtml(std::stringstream& stream ) {
 	for(std::map<std::string, std::shared_ptr<Collector> >::iterator i = collectors.begin();i != collectors.end();i++) {
@@ -309,4 +304,6 @@ void CollectorsManager::startThreads() {
 
 CollectorsManager::~CollectorsManager() {
 	// TODO free the ressources here
+}
+
 }
