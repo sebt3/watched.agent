@@ -68,6 +68,7 @@ public:
 	void doGetGraph(response_ptr response, request_ptr request);
 	void getDefinitions(Json::Value* p_defs);
 	void getPaths(Json::Value* p_defs);
+	std::string getHost();
 	void getIndexHtml(std::stringstream& stream );
 protected:
 	void addGetMetricRoute();
@@ -78,7 +79,8 @@ protected:
 	std::string morrisType;
 	std::string morrisOpts;
 	std::string name;
-	std::string type;
+	std::string basePath;
+	std::string host;
 private:
 	bool active;
 	std::thread my_thread;
@@ -94,11 +96,8 @@ extern std::map<std::string, collector_maker_t* > collectorFactory;
 
 }
 
-/*#define associate(s,type,regex,method)				\
-server->resource[regex][type]=[this](response_ptr response, request_ptr request) { this->method(response, request); }
-*/
 #define associate(s,type,regex,method)				\
-server->addResource(type,regex,[this](response_ptr response, request_ptr request) { this->method(response, request); });
+server->resource[regex][type]=[this](response_ptr response, request_ptr request) { this->method(response, request); }
 #define MAKE_PLUGIN_COLLECTOR(className,id)			\
 extern "C" {							\
 std::shared_ptr<Collector> maker_##id(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg){	\

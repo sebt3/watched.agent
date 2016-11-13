@@ -52,7 +52,7 @@ void servicesManager::init() {
 			continue;
 
 		if (file_name.substr(file_name.rfind(".")) == ".json") {
-			services.push_back(std::make_shared<service>(server, full_file_name));
+			services.push_back(std::make_shared<service>(full_file_name));
 		}
 	}
 	closedir(dir);
@@ -95,6 +95,7 @@ void servicesManager::init() {
 	systemCollectors	= std::make_shared<CollectorsManager>(server,cfg);
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	associate(server,"GET","^/$",doGetRootPage);
+	associate(server,"GET","^/service/(.*)/status$",doGetServiceStatus);
 	associate(server,"GET","^/api/swagger.json$",doGetJson);
 }
 
@@ -164,6 +165,36 @@ bool	servicesManager::havePID(uint32_t p_pid) {
 	return false;
 }
 
+
+void	servicesManager::doGetServiceStatus(response_ptr response, request_ptr request) {
+	std::stringstream ss;
+	std::string id   = request->path_match[1];
+	Json::Value obj(Json::objectValue);
+	Json::Value res(Json::objectValue);
+	if (id == "all") {
+		for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
+			res[(*i)->getID()] = obj;
+			(*i)->getJsonStatus( &(res[(*i)->getID()]) );
+		}
+		ss << res;
+		setResponseJson(response, ss.str());
+		return;
+	}
+
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
+		if ( *(*i) == id) {
+			(*i)->getJsonStatus( &res );
+			ss << res;
+			setResponseJson(response, ss.str());
+			return;
+		}
+	}
+	// returning an error
+	res["error"] = "No service matching '"+id+"' found";
+	ss << res;
+	setResponseJson(response, ss.str());
+}
+
 void servicesManager::doGetRootPage(response_ptr response, request_ptr request) {
 	std::stringstream stream;
         stream << "<html><head><title>" << APPS_NAME.c_str() << "</title>\n";
@@ -203,20 +234,34 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 	res["consumes"][0]			= "application/json";
 	res["produces"][0]			= "application/json";
 	res["definitions"]["services"]["type"]	= "object";
-	res["paths"]				= obj;
 
 	systemCollectors->getJson(&res);
 	res["definitions"]["serviceProcess"]["type"]				= "object";
+	res["definitions"]["serviceProcess"]["properties"]["cwd"]["type"]	= "string";
+	res["definitions"]["serviceProcess"]["properties"]["full_path"]["type"]	= "string";
 	res["definitions"]["serviceProcess"]["properties"]["name"]["type"]	= "string";
 	res["definitions"]["serviceProcess"]["properties"]["pid"]["type"]	= "number";
 	res["definitions"]["serviceProcess"]["properties"]["status"]["type"]	= "string";
+	res["definitions"]["serviceProcess"]["properties"]["username"]["type"]	= "string";
+	res["definitions"]["serviceProcess"]["requiered"][0]			= "name";
+	res["definitions"]["serviceProcess"]["requiered"][1]			= "status";
 	res["definitions"]["serviceSocket"]["type"]				= "object";
 	res["definitions"]["serviceSocket"]["properties"]["name"]["type"]	= "string";
 	res["definitions"]["serviceSocket"]["properties"]["status"]["type"]	= "string";
+	res["definitions"]["serviceSocket"]["requiered"][0]			= "name";
+	res["definitions"]["serviceSocket"]["requiered"][1]			= "status";
+	res["definitions"]["services"]["properties"]["host"]["type"]		= "string";
 	res["definitions"]["services"]["properties"]["process"]["type"]		= "array";
 	res["definitions"]["services"]["properties"]["process"]["items"]["type"]= "#/definitions/serviceProcess";
 	res["definitions"]["services"]["properties"]["sockets"]["type"]		= "array";
 	res["definitions"]["services"]["properties"]["sockets"]["items"]["type"]= "#/definitions/serviceSocket";
+	res["definitions"]["services"]["requiered"][0]				= "sockets";
+	res["definitions"]["services"]["requiered"][1]				= "process";
+	res["definitions"]["services"]["requiered"][2]				= "host";
+	res["paths"]["/service/all/status"]["get"]["responses"]["200"]["description"] = "All services status";
+	res["paths"]["/service/all/status"]["get"]["responses"]["200"]["schema"]["type"] = "object";
+	res["paths"]["/service/all/status"]["get"]["responses"]["200"]["schema"]["additionalProperties"]["$ref"] = "#/definitions/services";
+	res["paths"]["/service/all/status"]["get"]["summary"]			= "All services status";
 	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++)
 		(*i)->getJson(&res);
 
@@ -282,7 +327,7 @@ void socketDetector::find(void) {
 		for(std::vector< std::shared_ptr<socket> >::iterator it = sockets.begin(); it != sockets.end(); ++it) {
 			if (!p->haveSocket((*it)->getID())) continue;
 			// service found
-			std::shared_ptr<service> serv = std::make_shared<service>(server);
+			std::shared_ptr<service> serv = std::make_shared<service>();
 			serv->setSocket(*it);
 			serv->addMainProcess(p);
 			// remove the now associated socket from the list

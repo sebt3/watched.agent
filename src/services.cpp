@@ -1,5 +1,4 @@
 #include "agent.h"
-using namespace watcheD;
 
 #include <fstream>
 #include <iostream>
@@ -18,6 +17,10 @@ using namespace watcheD;
 #include <sys/stat.h>
 #include <dlfcn.h>
 #include <unistd.h> 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <pwd.h>
 namespace watcheD {
 
 /*********************************
@@ -61,11 +64,10 @@ std::string socket::getSource() {
 /*********************************
  * Process
  */
-process::process(uint32_t p_pid): pid(p_pid) {
-	char buf[512];
-	std::string file;
+process::process(uint32_t p_pid): pid(p_pid),username("") {
+	char buf[1024];
 	// get the full_path & base_name
-	file="/proc/"+std::to_string(pid)+"/exe";
+	std::string file = "/proc/"+std::to_string(pid)+"/exe";
 	int count = readlink(file.c_str(), buf, sizeof(buf));
 	if(count>0) {
 		buf[count] = '\0';
@@ -74,7 +76,7 @@ process::process(uint32_t p_pid): pid(p_pid) {
 	}
 }
 
-process::process(std::string p_fullpath):pid(0), full_path(p_fullpath) {
+process::process(std::string p_fullpath):pid(0),username(""), full_path(p_fullpath) {
 	base_name = full_path.substr(full_path.rfind("/")+1);
 }
 
@@ -120,14 +122,56 @@ bool process::getStatus() {
 	return (stat (p.c_str(), &buffer) == 0); 
 }
 
+std::string	process::getUsername() {
+	if (username != "" || !getStatus())
+		return username;
+	uint32_t uid = 0;
+	bool found = false;
+	std::string line;
+	struct passwd *pw;
+	std::ifstream	infile("/proc/"+std::to_string(pid)+"/status");
+	while(infile.good() && getline(infile, line)) {
+		std::istringstream iss(line);
+		std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
+		if (tokens[0] == "Uid:") {
+			uid  = atoi(tokens[1].c_str());
+			found=true;
+			break;
+		}
+	}
+	if (infile.good())
+		infile.close();
+
+	if (!found)
+		return username;
+	std::cout << "uid=" << uid << std::endl;
+	pw = getpwuid (uid);
+	if (! pw) return std::to_string(uid);
+ 	username = pw->pw_name;
+	return username;
+}
+
+std::string	process::getCWD() {
+	if (cwd != "" || !getStatus())
+		return cwd;
+	char buf[1024];
+	std::string file = "/proc/"+std::to_string(pid)+"/cwd";
+	int count = readlink(file.c_str(), buf, sizeof(buf));
+	if (count>0) {
+		buf[count] = '\0';
+		cwd = buf;
+	}
+	return cwd;
+}
 
 /*********************************
  * Services
  */
-service::service(std::shared_ptr<HttpServer> p_server): name(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), server(p_server) {
+service::service(): name(""), host(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL) {
+	setDefaultHost();
 }
 
-service::service(std::shared_ptr<HttpServer> p_server, std::string p_file_path): name(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), cfgFile(p_file_path), server(p_server) {
+service::service(std::string p_file_path): name(""), host(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), cfgFile(p_file_path) {
 	std::ifstream cfgif (cfgFile);
 	if (cfgif.good()) {
 		cfgif >> cfg;
@@ -139,18 +183,21 @@ service::service(std::shared_ptr<HttpServer> p_server, std::string p_file_path):
 			setSocket(std::make_shared<socket>(line.asString()));
 	if (cfg.isMember("uniqName"))
 		uniqName = cfg["uniqName"].asString();
+	if (cfg.isMember("host"))
+		host = cfg["host"].asString();
 	if (cfg.isMember("process")) 
 		for (const Json::Value& line : cfg["process"])
 			addMainProcess(std::make_shared<process>(line.asString()));
+	setDefaultHost();
 }
 
 service::service(const service& p_src) {
 	// copy constructor
 	name	= p_src.name;
 	uniqName= p_src.uniqName;
+	host	= p_src.host;
 	type	= p_src.type;
 	cfg	= p_src.cfg;
-	server	= p_src.server;
 	cfgFile = p_src.cfgFile;
 	for(std::vector< std::shared_ptr<socket> >::const_iterator i=p_src.sockets.begin();i!=p_src.sockets.end();i++)
 		sockets.push_back(*i);
@@ -158,9 +205,31 @@ service::service(const service& p_src) {
 		mainProcess.push_back(*i);
 	for(std::vector< std::shared_ptr<Collector> >::const_iterator i=p_src.collectors.begin();i!=p_src.collectors.end();i++)
 		collectors.push_back(*i);
-	if (mainProcess.size() > 0)
-		associate(server,"GET","^/service/"+name + "-" + uniqName+"/status$",doGetStatus);
+	setDefaultHost();
 }
+
+void	service::setDefaultHost() {
+	if (host != "") return;
+	struct addrinfo hints, *info;//, *p;
+	int gai_result;
+	char ghost[1024];
+	memset(ghost,0,1024);
+	gethostname(ghost,1023);
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_CANONNAME;
+	if ((gai_result = getaddrinfo(ghost, "http", &hints, &info)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(gai_result));
+		return;
+	}
+	/*for(p = info; p != NULL; p = p->ai_next) {
+		printf("hostname: %s\n", p->ai_canonname);
+	}*/
+	host = info->ai_canonname;
+	freeaddrinfo(info);
+}
+
 void	service::setDefaultConfig() {
 	Json::Value arr(Json::arrayValue);
 
@@ -178,10 +247,12 @@ void	service::setDefaultConfig() {
 	for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
 		cfg["process"].append((*i)->getPath());
 	cfg["uniqName"] = uniqName;
+	cfg["host"] = host;
 }
+
 void	service::saveConfigTemplate(std::string p_cfg_dir){
 	setDefaultConfig();
-	std::string fname = p_cfg_dir+std::string("/")+name+std::string(".json.template");
+	std::string fname = p_cfg_dir+std::string("/")+name+"-"+uniqName+std::string(".json.template");
 	std::ofstream cfgof (fname, std::ifstream::out);
 	cfgof<<cfg;
 	cfgof.close();
@@ -197,11 +268,9 @@ void	service::setSocket(std::shared_ptr<socket> p_sock) {
 }
 
 void 	service::addMainProcess(std::shared_ptr<process> p_p) { 
-	if (mainProcess.size()==0)
+	if (mainProcess.size()==0 && name == "")
 		name = p_p->getName();
 	mainProcess.push_back(p_p);
-	//std::string tmp = name + "-" + uniqName;
-	associate(server,"GET","^/service/"+name + "-" + uniqName+"/status$",doGetStatus);
 	
 	//TODO: detect sub processes (which have ppid=p_p)
 }
@@ -218,39 +287,35 @@ bool	service::havePID(uint32_t p_pid) {
 	return false;
 }
 
-void	service::doGetStatus(response_ptr response, request_ptr request) {
-	//string name   = request->path_match[1];
-	std::stringstream ss;
-	Json::Value ret(Json::objectValue);
-	
+void	service::getJsonStatus(Json::Value* ref) {
 	int n=0;for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++,n++) {
-		ret["sockets"][n]["name"]   = (*i)->getSource();
-		ret["sockets"][n]["status"] = "ok"; // TODO actually support this for correct service monitoring
+		(*ref)["sockets"][n]["name"]   = (*i)->getSource();
+		(*ref)["sockets"][n]["status"] = "ok"; // TODO actually support this for correct service monitoring
 	}
 	n=0;for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++,n++) {
-		ret["process"][n]["name"]   = (*i)->getName();
-		ret["process"][n]["status"] = "ok";
+		(*ref)["process"][n]["name"]   = (*i)->getName();
+		(*ref)["process"][n]["full_path"]   = (*i)->getPath();
+		(*ref)["process"][n]["status"] = "ok";
 		if (! (*i)->getStatus()) {
 			std::string stts = "failed";
 			if (haveHandler() && handler->isBlackout())
 				stts = "ok (blackout)";
-			ret["process"][n]["status"] = stts;
+			(*ref)["process"][n]["status"] = stts;
+		} else {
+			(*ref)["process"][n]["pid"]  = (*i)->getPID();
+			(*ref)["process"][n]["cwd"]   = (*i)->getCWD();
+			(*ref)["process"][n]["username"]   = (*i)->getUsername();
 		}
-		else
-			ret["process"][n]["pid"]  = (*i)->getPID();
 	}
-		
-	ss << ret;
-	
-	setResponseJson(response, ss.str());
+	(*ref)["host"] = host;
 }
 
 void	service::getIndexHtml(std::stringstream& stream ) {
-	stream << "<h3><a href='/service/" << name << "-" << uniqName <<"/status'>" << name << " - " << uniqName << "(" << type << ")</a></h3>\n";
+	stream << "<h3><a href='/service/" << getID() <<"/status'>" << name << " - " << uniqName << "(" << type << ")</a></h3>\n";
 }
 
 void	service::getJson(Json::Value* p_defs) {
-	std::string p = "/service/"+name+"/status";
+	std::string p = "/service/"+getID()+"/status";
 	(*p_defs)["paths"][p]["get"]["responses"]["200"]["schema"]["$ref"] = "#/definitions/services";
 	(*p_defs)["paths"][p]["get"]["responses"]["200"]["description"] = name+" status";
 	(*p_defs)["paths"][p]["get"]["summary"] = name+" service status";
@@ -271,8 +336,12 @@ bool	service::operator==(const service& rhs) {
 		if (!rhs.haveSocket((*i)->getSource()))
 			return false;
 	}
-	//TODO: service matching should be smarter than this (checking process name too)
+	//TODO: service matching should be smarter than this (checking process name, username too)
 	return true;
+}
+
+bool	service::operator==(const std::string rhs) {
+	return (rhs == name+"-"+uniqName );
 }
 
 void	service::updateFrom(std::shared_ptr<service> src) {

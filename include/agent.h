@@ -78,6 +78,7 @@ public:
 	bool	haveSocket(uint32_t p_socket_id);
 	bool	havePID(uint32_t p_pid);
 	void	doGetJson(response_ptr response, request_ptr request);
+	void	doGetServiceStatus(response_ptr response, request_ptr request);
 	void	doGetRootPage(response_ptr response, request_ptr request);
 	void	startThreads();
 	std::shared_ptr<service> enhanceFromFactory(std::string p_id, std::shared_ptr<service> p_serv);
@@ -101,6 +102,27 @@ public:
 	socketDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server):serviceDetector(p_sm, p_server) {}
 	void find();
 };
+
+/*********************************
+ * ServiceCPUCollector
+ */
+class serviceCollector : public Collector {
+public:
+	serviceCollector(std::string p_name, std::shared_ptr<service> p_serv, std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector(p_name, p_srv, p_cfg), serv(p_serv) {
+		basePath = "/service/"+p_serv->getID()+"/";
+	}
+protected:
+	std::weak_ptr<service> serv;
+};
+class serviceCpuCollector : public serviceCollector {
+public:
+	serviceCpuCollector(std::shared_ptr<service> p_serv, std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : serviceCollector("serviceCPU", p_serv, p_srv, p_cfg) {	}
+	void	collect() {
+		
+	}
+};
+
+
 
 }
 

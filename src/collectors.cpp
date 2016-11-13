@@ -83,7 +83,7 @@ void Ressource::getDefinition(Json::Value* p_defs) {
  * Collector
  */
 
-Collector::Collector(string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), type("system"), active(false),  server(p_server) {
+Collector::Collector(string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), basePath("/system/"), active(false),  server(p_server) {
 	if(! cfg->isMember("history") && p_history>0) {
 		(*cfg)["history"] = p_history;
 		(*cfg)["history"].setComment(std::string("/*\t\tNumber of elements to keep*/"), Json::commentAfterOnSameLine);
@@ -124,9 +124,9 @@ void Collector::addRessource(string p_name, string p_desc, std::string p_typeNam
 }
 
 void Collector::addGetMetricRoute() {
-	associate(server,"GET","^/"+type+"/"+name+"/(.*)/history$",doGetHistory);
-	associate(server,"GET","^/"+type+"/"+name+"/(.*)/history.since=([0-9.]*)$",doGetHistory);
-	associate(server,"GET","^/"+type+"/"+name+"/(.*)/graph$",doGetGraph);
+	associate(server,"GET","^"+basePath+name+"/(.*)/history$",doGetHistory);
+	associate(server,"GET","^"+basePath+name+"/(.*)/history.since=([0-9.]*)$",doGetHistory);
+	associate(server,"GET","^"+basePath+name+"/(.*)/graph$",doGetGraph);
 }
 
 void Collector::getDefinitions(Json::Value* p_defs) {
@@ -140,18 +140,40 @@ void Collector::getDefinitions(Json::Value* p_defs) {
 	}
 }
 
+std::string Collector::getHost() {
+	if (host != "")
+		return host;
+
+	struct addrinfo hints, *info;
+	int gai_result;
+	char ghost[1024];
+	memset(ghost,0,1024);
+	gethostname(ghost,1023);
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_CANONNAME;
+	if ((gai_result = getaddrinfo(ghost, "http", &hints, &info)) != 0)
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(gai_result));
+	else
+		host = info->ai_canonname;
+
+	return host;
+}
+
 void Collector::getPaths(Json::Value* p_defs) {
 	if ((*cfg)["enable"].asBool()) {
 		for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
-			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["summary"] = desc[i->first];
-			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["name"] = "len";
-			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["in"] = "query";
-			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["type"] = "integer";
-			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["required"] = false;
-			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["parameters"][0]["description"] = "Length of the history to fetch";
-			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["description"] = desc[i->first];
-			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["schema"]["type"] = "array";
-			(*p_defs)["/"+type+"/"+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["schema"]["items"]["$ref"] = "#/definitions/"+i->second->typeName; //name+"-"+i->first;
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["x-host"] = getHost();
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["get"]["summary"] = desc[i->first];
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["get"]["parameters"][0]["name"] = "len";
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["get"]["parameters"][0]["in"] = "query";
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["get"]["parameters"][0]["type"] = "integer";
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["get"]["parameters"][0]["required"] = false;
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["get"]["parameters"][0]["description"] = "Length of the history to fetch";
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["description"] = desc[i->first];
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["schema"]["type"] = "array";
+			(*p_defs)[basePath+name+"/"+i->first+"/history"]["get"]["responses"]["200"]["schema"]["items"]["$ref"] = "#/definitions/"+i->second->typeName; //name+"-"+i->first;
 		}
 	}
 }
@@ -174,7 +196,7 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
 	stream << "<script src=\"http://cdnjs.cloudflare.com/ajax/libs/morris.js/0.5.1/morris.min.js\"></script>\n";
 	stream << "</head><body><div id=\"" << name_c << "-graph\"></div>\n<script>\n";
 	stream << "function updateLiveGraph(" << name_c << "Graph) {\n";
-	stream << "  $.getJSON('/"+type+"/" << name_c << "/" << id.c_str() << "/history', function(results) { " << name_c;
+	stream << "  $.getJSON('"+basePath << name_c << "/" << id.c_str() << "/history', function(results) { " << name_c;
 	stream << "Graph.setData(results); });\n}\n" << name_c << "Graph = new Morris."<< morrisType.c_str() << "({element: '" << name_c;
 	stream << "-graph',  data: [], xkey: 'timestamp', pointSize:0,fillOpacity:0.3," << morrisOpts.c_str();
 	stream << ressources[id]->getMorrisDesc().c_str() << "});\n";
@@ -207,7 +229,7 @@ void Collector::getIndexHtml(std::stringstream& stream ){
 	if ((*cfg)["enable"].asBool()) {
 		stream << "<h3>" << name.c_str() << "</h3><ul>\n";
 		for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
-			stream << "<li><a href=\"/"+type+"/" << name.c_str() << "/" << i->first.c_str() << "/graph\">" << desc[i->first].c_str() << "</a></li>\n";
+			stream << "<li><a href=\""+basePath << name.c_str() << "/" << i->first.c_str() << "/graph\">" << desc[i->first].c_str() << "</a></li>\n";
 		}
 		stream << "</ul>\n";
 	}
