@@ -81,12 +81,12 @@ public:
 	bool		haveSocket(std::string p_source) const;
 	bool		havePID(uint32_t p_pid);
 	bool		haveHandler() { return handler != NULL; }
+	bool		needSocketFrom(std::shared_ptr<service> p_service);
 	std::string	getType() { return type; }
 	std::string	getName() { return name; }
 	std::string	getID() { return name+"-"+uniqName; }
 
 	void		setSocket(std::shared_ptr<socket> p_sock);
-	bool		needProcess(std::shared_ptr<process> p_process);
 	void 		addMainProcess(std::shared_ptr<process> p_p);
 	void		setHandler(std::shared_ptr<serviceHandler> p_h) { handler = p_h; }
 	void		setType(std::string p_type) { type=p_type; }

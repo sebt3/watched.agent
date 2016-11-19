@@ -295,9 +295,13 @@ bool	service::havePID(uint32_t p_pid) {
 void	service::getJsonStatus(Json::Value* ref) {
 	int n=0;for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++,n++) {
 		(*ref)["sockets"][n]["name"]   = (*i)->getSource();
-		(*ref)["sockets"][n]["status"] = "ok";
-		if (! haveSocket((*i)->getID()))
-			(*ref)["sockets"][n]["status"] = "failed";
+		std::string stts = "ok";
+		if (! haveSocket((*i)->getID())) {
+			stts = "failed";
+			if (haveHandler() && handler->isBlackout())
+				stts = "ok (blackout)";
+		}
+		(*ref)["sockets"][n]["status"] = stts;
 	}
 	n=0;for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++,n++) {
 		(*ref)["process"][n]["name"]   = (*i)->getName();
@@ -335,17 +339,15 @@ bool	service::haveSocket(std::string p_source) const {
 	}
 	return false;
 }
-
-bool	service::needProcess(std::shared_ptr<process> p_process) {
-	bool found = false;
-	for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++) {
-		if (! (*i)->getStatus() && p_process->getPath() == (*i)->getPath()) {
-			found=true;
-			break;
+bool	service::needSocketFrom(std::shared_ptr<service> p_service) {
+	for(std::vector< std::shared_ptr<socket> >::iterator i = sockets.begin();i!=sockets.end();i++) {
+		if (haveSocket((*i)->getID()))
+			continue; // skip working ssocket
+		for(std::vector< std::shared_ptr<socket> >::iterator j = p_service->sockets.begin();j!=p_service->sockets.end();j++) {
+			if ( (*j)->getSource() == (*i)->getSource() )
+				return true;
 		}
 	}
-	if(!found) return false;
-	
 	return false;
 }
 
@@ -365,9 +367,28 @@ bool	service::operator==(const std::string rhs) {
 }
 
 void	service::updateFrom(std::shared_ptr<service> src) {
-	mainProcess.clear();
-	for(std::vector< std::shared_ptr<process> >::iterator i=src->mainProcess.begin();i!=src->mainProcess.end();i++)
+	//mainProcess.clear();
+	for(std::vector< std::shared_ptr<process> >::iterator i=src->mainProcess.begin();i!=src->mainProcess.end();i++) {
+		for(std::vector< std::shared_ptr<process> >::iterator j=mainProcess.begin();j!=mainProcess.end();j++) {
+			if (! (*j)->getStatus() && (*j)->getPath() == (*i)->getPath()) {
+				j = mainProcess.erase(j);
+				break;
+			}
+		}
+
 		addMainProcess((*i));
+	}
+	for(std::vector< std::shared_ptr<socket> >::iterator i=src->sockets.begin();i!=src->sockets.end();i++) {
+		for(std::vector< std::shared_ptr<socket> >::iterator j=sockets.begin();j!=sockets.end();j++) {
+			if ((*j)->getSource() == (*i)->getSource()) {
+				j = sockets.erase(j);
+				break;
+			}
+		}
+
+		setSocket((*i));
+	}
+	// TODO: should update sockets too
 }
 
 }

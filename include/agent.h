@@ -74,7 +74,6 @@ public:
 	servicesManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg);
 	void	init();
 	void	find();
-	bool 	matchProcess(std::shared_ptr<process> p_process);
 	void	addService(std::shared_ptr<service> p_serv);
 	bool	haveSocket(uint32_t p_socket_id);
 	bool	havePID(uint32_t p_pid);

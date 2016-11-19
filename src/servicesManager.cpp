@@ -114,15 +114,6 @@ void servicesManager::startThreads() {
 
 }
 
-bool servicesManager::matchProcess(std::shared_ptr<process> p_process) {
-	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++){
-		if ( (*i)->needProcess(p_process) )
-			return true;
-	}
-	
-	return false;
-}
-
 void servicesManager::addService(std::shared_ptr<service> p_serv) {
 	std::shared_ptr<service> add = p_serv;
 	// try to improve the service
@@ -136,7 +127,14 @@ void servicesManager::addService(std::shared_ptr<service> p_serv) {
 
 	// Detect if the service isnt already known
 	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++){
-		if ( *(*i) == *add ) {
+		if ( *add == *(*i) ) {
+			(*i)->updateFrom(add);
+			return;
+		}
+	}
+	// Detect if this is a missing part of a service
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++){
+		if ((*i)->needSocketFrom(add) ) {
 			(*i)->updateFrom(add);
 			return;
 		}
@@ -332,10 +330,6 @@ void socketDetector::find(void) {
 			continue; // process already associated to a service
 		std::shared_ptr<process> p = std::make_shared<process>(atoi(file.c_str()));
 		p->setSockets();
-		// try to match a known service
-		if (mgr->matchProcess(p))
-			continue;
-		// Create new service if there's a matching socket
 		for(std::vector< std::shared_ptr<socket> >::iterator it = sockets.begin(); it != sockets.end(); ++it) {
 			if (!p->haveSocket((*it)->getID())) continue;
 			// socket found, create the service
