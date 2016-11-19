@@ -37,7 +37,9 @@ private:
 /*********************************
  * Process
  */
+
 class process {
+	friend class service;
 public:
 	process(uint32_t p_pid);
 	process(std::string p_fullpath);
@@ -84,6 +86,7 @@ public:
 	std::string	getID() { return name+"-"+uniqName; }
 
 	void		setSocket(std::shared_ptr<socket> p_sock);
+	bool		needProcess(std::shared_ptr<process> p_process);
 	void 		addMainProcess(std::shared_ptr<process> p_p);
 	void		setHandler(std::shared_ptr<serviceHandler> p_h) { handler = p_h; }
 	void		setType(std::string p_type) { type=p_type; }

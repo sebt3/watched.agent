@@ -144,7 +144,6 @@ std::string	process::getUsername() {
 
 	if (!found)
 		return username;
-	std::cout << "uid=" << uid << std::endl;
 	pw = getpwuid (uid);
 	if (! pw) return std::to_string(uid);
  	username = pw->pw_name;
@@ -277,9 +276,15 @@ void 	service::addMainProcess(std::shared_ptr<process> p_p) {
 
 bool	service::haveSocket(uint32_t p_socket_id) {
 	for (std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
-		if ((*i)->haveSocket(p_socket_id)) return true;
+		if ((*i)->getStatus() && (*i)->haveSocket(p_socket_id)) return true;
 	return false;
 }
+/*
+bool	service::haveProcessSocket(std::string p_socket_source) {
+	for (std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
+		if ((*i)->getSource() == p_socket_source) return true;
+	return false;
+}*/
 
 bool	service::havePID(uint32_t p_pid) {
 	for (std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
@@ -290,7 +295,9 @@ bool	service::havePID(uint32_t p_pid) {
 void	service::getJsonStatus(Json::Value* ref) {
 	int n=0;for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++,n++) {
 		(*ref)["sockets"][n]["name"]   = (*i)->getSource();
-		(*ref)["sockets"][n]["status"] = "ok"; // TODO actually support this for correct service monitoring
+		(*ref)["sockets"][n]["status"] = "ok";
+		if (! haveSocket((*i)->getID()))
+			(*ref)["sockets"][n]["status"] = "failed";
 	}
 	n=0;for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++,n++) {
 		(*ref)["process"][n]["name"]   = (*i)->getName();
@@ -326,6 +333,19 @@ bool	service::haveSocket(std::string p_source) const {
 		if ((*i)->getSource()  == p_source)
 			return true;
 	}
+	return false;
+}
+
+bool	service::needProcess(std::shared_ptr<process> p_process) {
+	bool found = false;
+	for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++) {
+		if (! (*i)->getStatus() && p_process->getPath() == (*i)->getPath()) {
+			found=true;
+			break;
+		}
+	}
+	if(!found) return false;
+	
 	return false;
 }
 

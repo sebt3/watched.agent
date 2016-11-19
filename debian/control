@@ -10,4 +10,4 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: watch over your system
  Collect performance metrics
- Monitor key system ressources
+ Monitor key system ressources and services
