@@ -5,14 +5,30 @@
 #include <string>
 #include <thread>
 #include "server_http.hpp"
-#include "client_http.hpp"
-typedef SimpleWeb::Server<SimpleWeb::HTTP> HttpServer;
-typedef SimpleWeb::Client<SimpleWeb::HTTP> HttpClient;
-typedef std::shared_ptr<HttpServer::Response> response_ptr;
-typedef std::shared_ptr<HttpServer::Request> request_ptr;
+#include "server_https.hpp"
 
 namespace watcheD {
+typedef std::shared_ptr<std::stringstream> response_ptr;
+typedef std::shared_ptr<std::vector<std::string>> request_ptr;
 
+/*********************************
+ * Server
+ */
+typedef SimpleWeb::Server<SimpleWeb::HTTP> SWHttpServer;
+typedef SimpleWeb::Server<SimpleWeb::HTTPS> SWHttpsServer;
+
+class HttpServer {
+public:
+	HttpServer(Json::Value* p_cfg);
+	void setRegex(std::string p_opt, std::string p_regex, std::function<void(response_ptr, request_ptr)> p_fnct);
+	void setDefault(std::string p_opt, std::function<void(response_ptr, request_ptr)> p_fnct);
+	void start();
+private:
+	std::shared_ptr<SWHttpServer>  http;
+	std::shared_ptr<SWHttpsServer> https;
+	Json::Value* cfg;
+	bool useSSL;
+};
 /*********************************
  * Ressource
  */
@@ -97,7 +113,7 @@ extern std::map<std::string, collector_maker_t* > collectorFactory;
 }
 
 #define associate(s,type,regex,method)				\
-server->resource[regex][type]=[this](response_ptr response, request_ptr request) { this->method(response, request); }
+server->setRegex(type,regex,[this](response_ptr response, request_ptr request) { this->method(response, request); });
 #define MAKE_PLUGIN_COLLECTOR(className,id)			\
 extern "C" {							\
 std::shared_ptr<Collector> maker_##id(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg){	\

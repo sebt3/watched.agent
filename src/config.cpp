@@ -1,4 +1,5 @@
 #include "agent.h"
+#include "config.h"
 
 #include <list>
 #include <fstream>
@@ -29,9 +30,26 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 		data["server"]["port"].setComment(std::string("/*\t\tTCP port number */"), Json::commentAfterOnSameLine);
 	}
 
+	if (! data["server"].isMember("useSSL")) {
+		data["server"]["useSSL"] = false;
+		data["server"]["useSSL"].setComment(std::string("/*\t\tEnable SSL */"), Json::commentAfterOnSameLine);
+	}
+	if (! data["server"].isMember("SSL_key")) {
+		data["server"]["SSL_key"] = WATCHED_SSL_KEY;
+		data["server"]["SSL_key"].setComment(std::string("/*\t\tSSL private key file */"), Json::commentAfterOnSameLine);
+	}
+	if (! data["server"].isMember("SSL_cert")) {
+		data["server"]["SSL_cert"] = WATCHED_SSL_CERT;
+		data["server"]["SSL_cert"].setComment(std::string("/*\t\tSSL certificate file for the agent */"), Json::commentAfterOnSameLine);
+	}
+	if (! data["server"].isMember("SSL_verify")) {
+		data["server"]["SSL_verify"] = WATCHED_SSL_VRF;
+		data["server"]["SSL_verify"].setComment(std::string("/*\t\tSSL certificate file containing the backend keychain */"), Json::commentAfterOnSameLine);
+	}
+
 	// services
 	if (! data.isMember("services") || ! data["services"].isMember("config_dir")) {
-		data["services"]["config_dir"] = "cfgs";
+		data["services"]["config_dir"] = WATCHED_CFG_SRV;
 		data["services"]["config_dir"].setComment(std::string("/*\t\tThe directory where the *.json service configuration files are stored*/"), Json::commentAfterOnSameLine);
 	}
 	if (! data["services"].isMember("find_frequency")) {
@@ -41,15 +59,15 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 
 	// plugins
 	if (! data.isMember("plugins") || ! data["plugins"].isMember("services_cpp")) {
-		data["plugins"]["services_cpp"] = "services";
+		data["plugins"]["services_cpp"] = WATCHED_DLL_SRV;
 		data["plugins"]["services_cpp"].setComment(std::string("/*\t\tThe directory where the *.so services plugins are stored*/"), Json::commentAfterOnSameLine);
 	}
 	if (! data["plugins"].isMember("collectors_cpp")) {
-		data["plugins"]["collectors_cpp"] = "collectors";
+		data["plugins"]["collectors_cpp"] = WATCHED_DLL_COLL;
 		data["plugins"]["collectors_cpp"].setComment(std::string("/*\t\tThe directory where the *.so collector plugins are stored*/"), Json::commentAfterOnSameLine);
 	}
 	if (! data["plugins"].isMember("collectors_lua")) {
-		data["plugins"]["collectors_lua"] = "../luaCollectors";
+		data["plugins"]["collectors_lua"] = WATCHED_LUA_COLL;
 		data["plugins"]["collectors_lua"].setComment(std::string("/*\t\tThe directory where the *.lua collector plugins are stored*/"), Json::commentAfterOnSameLine);
 	}
 }

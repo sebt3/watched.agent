@@ -179,7 +179,7 @@ void Collector::getPaths(Json::Value* p_defs) {
 }
 
 void Collector::doGetGraph(response_ptr response, request_ptr request) {
-	string id   = request->path_match[1];
+	string id   = (*request)[0];
 	string str;
 	const char* name_c  = name.c_str();
 
@@ -207,11 +207,11 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
 }
 
 void Collector::doGetHistory(response_ptr response, request_ptr request) {
-	string name   = request->path_match[1];
+	string name   = (*request)[0];
 	double since  = -1;
-	if (request->path_match.size()>1) {
+	if (request->size()>1) {
 		try {
-			since=stod(request->path_match[2]);
+			since=stod((*request)[1]);
 		} catch (std::exception &e) { }
 	}
         /*if (request.query().has("since"))

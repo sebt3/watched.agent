@@ -174,7 +174,7 @@ bool	servicesManager::havePID(uint32_t p_pid) {
 
 void	servicesManager::doGetServiceStatus(response_ptr response, request_ptr request) {
 	std::stringstream ss;
-	std::string id   = request->path_match[1];
+	std::string id   = (*request)[0];
 	Json::Value obj(Json::objectValue);
 	Json::Value res(Json::objectValue);
 	if (id == "all") {
