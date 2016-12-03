@@ -29,6 +29,10 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 		data["server"]["port"] = 9080;
 		data["server"]["port"].setComment(std::string("/*\t\tTCP port number */"), Json::commentAfterOnSameLine);
 	}
+	if (! data["server"].isMember("web_root")) {
+		data["server"]["web_root"] = WATCHED_WEB_ROOT;
+		data["server"]["web_root"].setComment(std::string("/*\t\tAgent micro web service base directory*/"), Json::commentAfterOnSameLine);
+	}
 
 	if (! data["server"].isMember("useSSL")) {
 		data["server"]["useSSL"] = false;

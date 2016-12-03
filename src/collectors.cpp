@@ -190,10 +190,10 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
 	}
 	std::stringstream stream;
         stream << "<html><head><title>" << APPS_NAME.c_str() << " - " << desc[id].c_str() << "</title>\n";
-        stream << "<link rel=\"stylesheet\" href=\"http://cdnjs.cloudflare.com/ajax/libs/morris.js/0.5.1/morris.css\">";
-	stream << "<script src=\"http://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js\"></script>";
-	stream << "<script src=\"http://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.0/raphael-min.js\"></script>";
-	stream << "<script src=\"http://cdnjs.cloudflare.com/ajax/libs/morris.js/0.5.1/morris.min.js\"></script>\n";
+        stream << "<link rel=\"stylesheet\" href=\"/css/morris.css\">";
+	stream << "<script src=\"/js/jquery.min.js\"></script>";
+	stream << "<script src=\"/js/raphael-min.js\"></script>";
+	stream << "<script src=\"/js/morris.min.js\"></script>\n";
 	stream << "</head><body><div id=\"" << name_c << "-graph\"></div>\n<script>\n";
 	stream << "function updateLiveGraph(" << name_c << "Graph) {\n";
 	stream << "  $.getJSON('"+basePath << name_c << "/" << id.c_str() << "/history', function(results) { " << name_c;

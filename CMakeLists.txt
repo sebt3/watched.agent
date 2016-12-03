@@ -116,6 +116,15 @@ foreach( collector_lua ${LUA_COLLECTORS_FILES} )
 	install(FILES ${collector_lua} DESTINATION lib/watched/collectors.lua)
 endforeach( collector_lua ${LUA_COLLECTORS_FILES} )
 
+# installing webroot files
+install(DIRECTORY DESTINATION lib/watched/webroot/js)
+install(DIRECTORY DESTINATION lib/watched/webroot/css)
+install(FILES "webroot/css/morris.css"    DESTINATION lib/watched/webroot/css)
+install(FILES "webroot/js/morris.min.js"  DESTINATION lib/watched/webroot/js)
+install(FILES "webroot/js/jquery.min.js"  DESTINATION lib/watched/webroot/js)
+install(FILES "webroot/js/raphael-min.js" DESTINATION lib/watched/webroot/js)
+
+
 
 ####
 ## Usefull debug stuff

@@ -3,6 +3,7 @@ const std::string WATCHED_CONFIG="@CMAKE_INSTALL_SYSCONFDIR@/watched/agent.confi
 const std::string WATCHED_DLL_COLL="@CMAKE_INSTALL_PREFIX@/lib/watched/collectors.cpp";
 const std::string WATCHED_LUA_COLL="@CMAKE_INSTALL_PREFIX@/lib/watched/collectors.lua";
 const std::string WATCHED_DLL_SRV="@CMAKE_INSTALL_PREFIX@/lib/watched/services.cpp";
+const std::string WATCHED_WEB_ROOT="@CMAKE_INSTALL_PREFIX@/lib/watched/webroot";
 const std::string WATCHED_CFG_SRV="@CMAKE_INSTALL_SYSCONFDIR@/watched/services";
 const std::string WATCHED_SSL_KEY="@CMAKE_INSTALL_SYSCONFDIR@/watched/ssl/agent.key";
 const std::string WATCHED_SSL_CERT="@CMAKE_INSTALL_SYSCONFDIR@/watched/ssl/agent.pem";
