@@ -96,6 +96,7 @@ void servicesManager::init() {
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	associate(server,"GET","^/$",doGetRootPage);
 	associate(server,"GET","^/service/(.*)/status$",doGetServiceStatus);
+	associate(server,"GET","^/service/(.*)/html$",doGetServiceHtml);
 	associate(server,"GET","^/api/swagger.json$",doGetJson);
 }
 
@@ -201,16 +202,52 @@ void	servicesManager::doGetServiceStatus(response_ptr response, request_ptr requ
 	setResponseJson(response, ss.str());
 }
 
+void	servicesManager::doGetServiceHtml(response_ptr response, request_ptr request) {
+	std::stringstream ss;
+	std::string id   = (*request)[0];
+	Json::Value res(Json::objectValue);
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
+		if ( *(*i) == id) {
+			ss << server->getHead("Service", (*i)->getID());
+			(*i)->getJsonStatus( &res );
+			ss << "<div class=\"row\"><div class=\"col-md-8\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Process</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>name</th><th>path</th><th>cwd</th><th>username</th><th>PID</th><th>status</th></tr></thead><tbody>\n";
+			for (Json::Value::iterator j = res["process"].begin();j!=res["process"].end();j++) {
+				std::string color = "green";
+				if ((*j)["status"].asString() != "ok") 
+					color = "red";
+				ss << "<tr><td>"+(*j)["name"].asString()+"</td><td>"+(*j)["full_path"].asString()+"</td><td>"+(*j)["cwd"].asString()+"</td><td>"+(*j)["username"].asString()+"</td><td>"+(*j)["pid"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
+			}
+			ss << "</tbody></table></div></div></div>\n<div class=\"col-md-4\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Sockets</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>listen</th><th>status</th></tr></thead><tbody>\n";
+			for (Json::Value::iterator j = res["sockets"].begin();j!=res["sockets"].end();j++) {
+				std::string color = "green";
+				if ((*j)["status"].asString() != "ok") 
+					color = "red";
+				ss << "<tr><td>"+(*j)["name"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
+			}
+			ss << "</tbody></table></div></div></div></div>\n";
+			ss << server->getFoot("");
+			setResponseHtml(response, ss.str());
+			return;
+		}
+	}
+	// returning an error
+	setResponse404(response, "No service matching '" + id + "' found");
+}
+
 void servicesManager::doGetRootPage(response_ptr response, request_ptr request) {
 	std::stringstream stream;
-        stream << "<html><head><title>" << APPS_NAME.c_str() << "</title>\n";
-	stream << "</head><body><table width=100%><tr><td><h1>Services</h1>\n";
+        stream << server->getHead("Home");
+	stream << "<div class=\"row\"><div class=\"col-md-3\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Services</h3></div><div class=\"box-body\">\n";
+
 	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++)
 		(*i)->getIndexHtml(stream);
 
-	stream << "</td><td><h1>System</h1>\n";
+	stream << "</div></div></div>\n";
+
 	systemCollectors->getIndexHtml(stream);
-	stream << "</td></tr></table></body></html>\n";
+
+	stream << "</div>\n";
+        stream << server->getFoot("");
         setResponseHtml(response, stream.str());
 }
 

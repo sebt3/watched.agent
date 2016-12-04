@@ -15,7 +15,7 @@ void setResponse404(response_ptr response, std::string content) {
 	*response << "HTTP/1.1 404 Not found\r\nServer: watched.agent\r\nContent-Length: " << content.length() << "\r\n\r\n" << content;
 }
 void setResponseHtml(response_ptr response, std::string content) {
-	*response << "HTTP/1.1 200 OK\r\nServer: watched.agent\r\nAccess-Control-Allow-Origin:*\r\nContent-Type:text/html; charset=UTF-8\r\nContent-Length: " << content.length() << "\r\n\r\n" << content;
+	*response << "HTTP/1.1 200 OK\r\nServer: watched.agent\r\nContent-Type:text/html; charset=UTF-8\r\nContent-Length: " << content.length() << "\r\n\r\n" << content;
 }
 void setResponseJson(response_ptr response, std::string content) {
 	*response << "HTTP/1.1 200 OK\r\nServer: watched.agent\r\nContent-Type:application/json\r\nAccess-Control-Allow-Origin:*\r\nContent-Length: " << content.length() << "\r\n\r\n" << content;
@@ -189,20 +189,9 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
 		return;
 	}
 	std::stringstream stream;
-        stream << "<html><head><title>" << APPS_NAME.c_str() << " - " << desc[id].c_str() << "</title>\n";
-        stream << "<link rel=\"stylesheet\" href=\"/css/morris.css\">";
-	stream << "<script src=\"/js/jquery.min.js\"></script>";
-	stream << "<script src=\"/js/raphael-min.js\"></script>";
-	stream << "<script src=\"/js/morris.min.js\"></script>\n";
-	stream << "</head><body><div id=\"" << name_c << "-graph\"></div>\n<script>\n";
-	stream << "function updateLiveGraph(" << name_c << "Graph) {\n";
-	stream << "  $.getJSON('"+basePath << name_c << "/" << id.c_str() << "/history', function(results) { " << name_c;
-	stream << "Graph.setData(results); });\n}\n" << name_c << "Graph = new Morris."<< morrisType.c_str() << "({element: '" << name_c;
-	stream << "-graph',  data: [], xkey: 'timestamp', pointSize:0,fillOpacity:0.3," << morrisOpts.c_str();
-	stream << ressources[id]->getMorrisDesc().c_str() << "});\n";
-	stream << "updateLiveGraph(" << name_c << "Graph);setInterval(function() { updateLiveGraph(" << name_c;
-	stream << "Graph); }, " << (*cfg)["history"].asString().c_str() << ");\n";
-	stream << "</script></body></html>\n";
+        stream << server->getHead(desc[id]);
+	stream << "<div class=\"row\"><div class=\"col-md-12\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Graphics</h3></div><div class=\"box-body\"><div class=\"chart\"><div id=\"" << name_c << "-graph\"></div>\n</div></div></div></div></div>\n";
+        stream << server->getFoot("function updateLiveGraph("+name+"Graph) {\n  $.getJSON('"+basePath+name+"/"+id.c_str()+"/history', function(results) { "+name+"Graph.setData(results); });\n}\n"+name+"Graph = new Morris."+morrisType+"({element: '"+name+"-graph',  data: [], xkey: 'timestamp', pointSize:0,fillOpacity:0.3,"+morrisOpts+ressources[id]->getMorrisDesc()+"});\nupdateLiveGraph("+name+"Graph);setInterval(function() { updateLiveGraph("+name+"Graph); }, "+((*cfg)["history"].asString())+");\n");
         setResponseHtml(response, stream.str());
 }
 
@@ -227,11 +216,69 @@ void Collector::doGetHistory(response_ptr response, request_ptr request) {
 
 void Collector::getIndexHtml(std::stringstream& stream ){
 	if ((*cfg)["enable"].asBool()) {
-		stream << "<h3>" << name.c_str() << "</h3><ul>\n";
-		for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
-			stream << "<li><a href=\""+basePath << name.c_str() << "/" << i->first.c_str() << "/graph\">" << desc[i->first].c_str() << "</a></li>\n";
+		stream << "<div class=\"col-md-3\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">"+name+"</h3></div><div class=\"box-body\">\n";
+		if (name == "cpuload") {
+			stream << "<a href=\""+basePath+name+"/avg/graph\"><div class=\"clearfix\"><span class=\"pull-left\">Load average (1mn)</span><small class=\"pull-right\">"+ressources["avg"]->getValue("avg1")->asString()+"</small></div><div class=\"clearfix\"><span class=\"pull-left\">Load average (5mn)</span><small class=\"pull-right\">"+ressources["avg"]->getValue("avg5")->asString()+"</small></div><div class=\"clearfix\"><span class=\"pull-left\">Load average (15mn)</span><small class=\"pull-right\">"+ressources["avg"]->getValue("avg15")->asString()+"</small></div></a>\n";
+		}else if (name == "uptime") {
+			stream << "<a href=\""+basePath+name+"/uptime/graph\"><div class=\"clearfix\"><span class=\"pull-left\">uptime</span><small class=\"pull-right\">"+ressources["uptime"]->getValue("uptime")->asString()+"</small></div></a>\n";
+		}else if (name == "diskusage") {
+			for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+				double used = 100 - i->second->getValue("pctfree")->asDouble();
+				std::string color = "green";
+				if	(used>90)	color = "red";
+				else if (used>70)	color = "yellow";
+				else if (used<20)	color = "blue";
+				stream << "<a href=\""+basePath+name+"/"+i->first+"/graph\"><div class=\"clearfix\"><span class=\"pull-left\">"+desc[i->first]+"</span><small class=\"pull-right\">"+std::to_string(used)+"%</small></div><div class=\"progress xs\"><div class=\"progress-bar progress-bar-"+color+"\" style=\"width: "+std::to_string(used)+"%;\"></div></div></a>\n";
+			}
+		}else if (name == "memory") {
+			for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+				double used = 100 - i->second->getValue("pct")->asDouble();
+				std::string color = "green";
+				if	(used>90)	color = "red";
+				else if (used>70)	color = "yellow";
+				else if (used<20)	color = "blue";
+				stream << "<a href=\""+basePath+name+"/"+i->first+"/graph\"><div class=\"clearfix\"><span class=\"pull-left\">"+desc[i->first]+"</span><small class=\"pull-right\">"+std::to_string(used)+"%</small></div><div class=\"progress xs\"><div class=\"progress-bar progress-bar-"+color+"\" style=\"width: "+std::to_string(used)+"%;\"></div></div></a>\n";
+			}
+		}else if (name == "cpuuse") {
+			for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+				if (desc[i->first].substr(0,3) != "CPU") continue;
+				double user = i->second->getValue("user")->asDouble();		// red
+				double sys = i->second->getValue("system")->asDouble();		// yellow
+				double irq = i->second->getValue("irq")->asDouble();		// light-blue
+				double sirq = i->second->getValue("softirq")->asDouble();	// aqua
+				double nice = i->second->getValue("nice")->asDouble();		// green
+				double iowait = i->second->getValue("iowait")->asDouble();	// blue
+				double total = user+sys+irq+sirq+nice+iowait;
+				stream << "<a href=\""+basePath+name+"/"+i->first+"/graph\"><div class=\"clearfix\"><span class=\"pull-left\">"+desc[i->first]+"</span><small class=\"pull-right\">"+std::to_string(total)+"%</small></div><div class=\"progress xs\"><div class=\"progress-bar progress-bar-red\" style=\"width: "+std::to_string(user)+"%;\"></div><div class=\"progress-bar progress-bar-yellow\" style=\"width: "+std::to_string(sys)+"%;\"></div><div class=\"progress-bar progress-bar-green\" style=\"width: "+std::to_string(nice)+"%;\"></div><div class=\"progress-bar progress-bar-blue\" style=\"width: "+std::to_string(iowait)+"%;\"></div><div class=\"progress-bar progress-bar-light-blue\" style=\"width: "+std::to_string(irq)+"%;\"></div><div class=\"progress-bar progress-bar-aqua\" style=\"width: "+std::to_string(sirq)+"%;\"></div></div></a>\n";
+			}
+			stream << "<ul>\n";
+			for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+				if (desc[i->first].substr(0,3) == "CPU") continue;
+				stream << "<li><a href=\""+basePath+name+"/"+i->first+"/graph\">" << desc[i->first].c_str() << "</a></li>\n";
+			}
+			stream << "</ul>";
+		}else if (name == "cpuspeed") {
+			for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+				int used = i->second->getValue("MHz")->asInt();
+				stream << "<a href=\""+basePath+name+"/"+i->first+"/graph\"><div class=\"clearfix\"><span class=\"pull-left\">"+desc[i->first]+"</span><small class=\"pull-right\">"+std::to_string(used)+"Mhz</small></div></a>\n";
+			}
+		}else if (name == "diskstats") {
+			for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+				double used = i->second->getValue("iowtime")->asDouble()/10.0;
+				std::string color = "green";
+				if	(used>90)	color = "red";
+				else if (used>70)	color = "yellow";
+				else if (used<20)	color = "blue";
+				stream << "<a href=\""+basePath+name+"/"+i->first+"/graph\"><div class=\"clearfix\"><span class=\"pull-left\">"+desc[i->first]+"</span><small class=\"pull-right\">"+std::to_string(used)+"%</small></div><div class=\"progress xs\"><div class=\"progress-bar progress-bar-"+color+"\" style=\"width: "+std::to_string(used)+"%;\"></div></div></a>\n";
+			}
+		}else {
+			stream << "<ul>\n";
+			for(map<string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+				stream << "<li><a href=\""+basePath+name+"/"+i->first+"/graph\">" << desc[i->first].c_str() << "</a></li>\n";
+			}
+			stream << "</ul>";
 		}
-		stream << "</ul>\n";
+		stream << "</div></div></div>\n";
 	}
 }
 

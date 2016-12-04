@@ -60,7 +60,7 @@ HttpServer::HttpServer(Json::Value* p_cfg) : cfg(p_cfg) {
 	std::string sslcert	= (*cfg)["SSL_cert"].asString();
 	std::string sslvrf	= (*cfg)["SSL_verify"].asString();
 	useSSL			= (	(*cfg)["useSSL"].asBool() &&
-					(stat (sslcert.c_str(), &buffer) == 0) && // check if file exist
+					(stat (sslcert.c_str(), &buffer) == 0) && // check if files exist
 					(stat (sslvrf.c_str(), &buffer) == 0) &&
 					(stat (sslkey.c_str(), &buffer) == 0) );
 
@@ -195,6 +195,13 @@ void HttpServer::start() {
 		http->start();
 }
 
+std::string HttpServer::getHead(std::string p_title, std::string p_sub) {
+	return "<!DOCTYPE html>\n<html><head>\n<meta charset=\"utf-8\">\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n<title>"+APPS_NAME+" - "+p_title+"</title>\n<meta content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\" name=\"viewport\">\n<link rel=\"shortcut icon\" href=\"/favicon.ico\">\n<link rel=\"stylesheet\" href=\"/css/bootstrap.min.css\">\n<link rel=\"stylesheet\" href=\"/css/AdminLTE.min.css\">\n<link rel=\"stylesheet\" href=\"/css/skin-blue.css\">\n<link rel=\"stylesheet\" href=\"/css/font-awesome.min.css\">\n<link rel=\"stylesheet\" href=\"/css/ionicons.min.css\">\n<link rel=\"stylesheet\" href=\"/css/morris.css\">\n</head><body class=\"hold-transition skin-blue sidebar-collapse sidebar-mini\">\n<div class=\"wrapper\">\n<header class=\"main-header\"><a href=\"/\" class=\"logo\"> <span class=\"logo-mini\"><img src=\"/pic/watched32x32.png\" height=\"32\" width=\"32\" /></span></a><nav class=\"navbar navbar-static-top\"><a class=\"navbar-brand\" href=\"#\"><b>"+APPS_NAME+"</b></a><div class=\"navbar-custom-menu\"><ul class=\"nav navbar-nav\"></ul></div></nav></header>\n<aside class=\"main-sidebar\"><section class=\"sidebar\"><ul class=\"sidebar-menu\"></ul></section></aside>\n<div class=\"content-wrapper\"><section class=\"content-header\"><h1>"+p_title+"<small>"+p_sub+"</small></h1></section><section class=\"content\">\n";
+}
+
+std::string HttpServer::getFoot(std::string p_script) {
+	return "</section></div><footer class=\"main-footer\"><div class=\"pull-right hidden-xs\"><b>Version</b> 0.1.0    </div><strong>Copyright &copy; 2016<a href=\"https://github.com/sebt3\">Sébastien Huss</a>.</strong> All rights reserved.</footer></div>\n<script src=\"/js/jquery-2.2.3.min.js\"></script>\n<script src=\"/js/bootstrap.min.js\"></script>\n<script src=\"/js/Chart.min.js\"></script>\n<script src=\"/js/adminlte.min.js\"></script>\n<script src=\"/js/raphael-min.js\"></script>\n<script src=\"/js/morris.min.js\"></script>\n<script>\n"+p_script+"</script>\n</body>\n</html>\n";
+}
 
 /*********************************
  * main

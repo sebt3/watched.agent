@@ -322,7 +322,22 @@ void	service::getJsonStatus(Json::Value* ref) {
 }
 
 void	service::getIndexHtml(std::stringstream& stream ) {
-	stream << "<h3><a href='/service/" << getID() <<"/status'>" << name << " - " << uniqName << "(" << type << ")</a></h3>\n";
+	int ok=0;
+	int failed=0;
+	for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++) {
+		if ((! haveSocket((*i)->getID())) && !(haveHandler() && handler->isBlackout()))
+			failed++;
+		else	ok++;
+	}
+	for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++) {
+		if ( (! (*i)->getStatus()) && !(haveHandler() && handler->isBlackout()))
+			failed++;
+		else	ok++;
+	}
+	double pct_ok = (100.0*ok)/(ok+failed);
+	double pct_fail = (100.0*failed)/(ok+failed);
+	
+	stream << "<a href=\"/service/"+getID()+"/html\"><div class=\"clearfix\"><span class=\"pull-left\">"+name+" - "+uniqName+"</span></div><div class=\"progress xs\"><div class=\"progress-bar progress-bar-green\" style=\"width: "+std::to_string(pct_ok)+"%;\"></div><div class=\"progress-bar progress-bar-red\" style=\"width: "+std::to_string(pct_fail)+"%;\"></div></div></a>\n";
 }
 
 void	service::getJson(Json::Value* p_defs) {

@@ -79,6 +79,7 @@ public:
 	bool	havePID(uint32_t p_pid);
 	void	doGetJson(response_ptr response, request_ptr request);
 	void	doGetServiceStatus(response_ptr response, request_ptr request);
+	void	doGetServiceHtml(response_ptr response, request_ptr request);
 	void	doGetRootPage(response_ptr response, request_ptr request);
 	void	startThreads();
 	std::shared_ptr<service> enhanceFromFactory(std::string p_id, std::shared_ptr<service> p_serv);

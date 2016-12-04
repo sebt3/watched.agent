@@ -23,6 +23,8 @@ public:
 	void setRegex(std::string p_opt, std::string p_regex, std::function<void(response_ptr, request_ptr)> p_fnct);
 	void setDefault(std::string p_opt, std::function<void(response_ptr, request_ptr)> p_fnct);
 	void start();
+	std::string getHead(std::string p_title, std::string p_sub="");
+	std::string getFoot(std::string p_script);
 private:
 	std::shared_ptr<SWHttpServer>  http;
 	std::shared_ptr<SWHttpsServer> https;
