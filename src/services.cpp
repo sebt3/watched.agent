@@ -300,6 +300,9 @@ void	service::setSocket(std::shared_ptr<socket> p_sock) {
 		uniqName.replace(uniqName.find(":"),3,"_");
 		uniqName.replace(uniqName.rfind(":"),1,"_");
 	}
+	for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++)
+		if ((*i)->getSource()  == p_sock->getSource())
+			return;
 	sockets.push_back(p_sock);
 }
 

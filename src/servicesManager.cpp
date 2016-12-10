@@ -136,6 +136,7 @@ void servicesManager::addService(std::shared_ptr<service> p_serv) {
 	// Detect if this is a missing part of a service
 	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++){
 		if ((*i)->needSocketFrom(add) ) {
+			std::cout << "updating service\n";
 			(*i)->updateFrom(add);
 			return;
 		}
@@ -340,8 +341,6 @@ void socketDetector::find(void) {
 				continue; // keep only listening sockets
 			if (tokens[3] != "07" && i->first.substr(0,3) == "udp")
 				continue; // keep only listening sockets
-			if (mgr->haveSocket(atoi(tokens[9].c_str())))
-				continue; // socket already associated to a service
 			sockets.push_back(std::make_shared<socket>(line, i->first));
 		}
 		if (infile.good())
@@ -369,13 +368,10 @@ void socketDetector::find(void) {
 			std::shared_ptr<service> serv = std::make_shared<service>();
 			serv->setSocket(*it);
 			serv->addMainProcess(p);
-			// remove the now associated socket from the list
-			it = sockets.erase(it);
 			// trying to associate more sockets to this service
-			for(std::vector< std::shared_ptr<socket> >::iterator i = sockets.begin(); i != sockets.end(); ) {
-				if (!serv->haveSocket((*i)->getID())) {++i;continue; }
+			for(std::vector< std::shared_ptr<socket> >::iterator i = sockets.begin(); i != sockets.end();i++) {
+				if (!serv->haveSocket((*i)->getID())) continue;
 				serv->setSocket(*i);
-				i = sockets.erase(i);
 			}
 			mgr->addService(serv);
 			break;
