@@ -17,6 +17,10 @@ struct sock_addr {
 	uint16_t	ip2;
 	uint16_t	ip3;
 	uint16_t	ip4;
+	uint16_t	ip5;
+	uint16_t	ip6;
+	uint16_t	ip7;
+	uint16_t	ip8;
 };
 
 class socket {
@@ -32,6 +36,7 @@ protected:
 	struct sock_addr dest;
 private:
 	void setSockFrom(std::string src, struct sock_addr *sa);
+	void setSockFrom6(std::string src, struct sock_addr *sa);
 };
 
 /*********************************

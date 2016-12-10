@@ -73,7 +73,7 @@ private:
 /*********************************
  * Collector
  */
-
+class service;
 class Collector {
 public:
 	Collector(std::string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history = 300, uint p_freq_pool = 5);
@@ -86,6 +86,7 @@ public:
 	void doGetGraph(response_ptr response, request_ptr request);
 	void getDefinitions(Json::Value* p_defs);
 	void getPaths(Json::Value* p_defs);
+	void setService(std::shared_ptr<service> p_serv) { onService = p_serv; }
 	std::string getHost();
 	void getIndexHtml(std::stringstream& stream );
 protected:
@@ -93,16 +94,17 @@ protected:
 	void addRessource(std::string p_name, std::string p_desc, std::string p_typeName);
 	std::map<std::string, std::shared_ptr<Ressource> >	ressources;
 	std::map<std::string, std::string>			desc;
-	Json::Value* cfg;
-	std::string morrisType;
-	std::string morrisOpts;
-	std::string name;
-	std::string basePath;
-	std::string host;
+	Json::Value*			cfg;
+	std::string			morrisType;
+	std::string			morrisOpts;
+	std::string			name;
+	std::string			basePath;
+	std::string			host;
+	std::weak_ptr<service>		onService;
 private:
-	bool active;
-	std::thread my_thread;
-	std::shared_ptr<HttpServer> server;
+	bool				active;
+	std::thread			my_thread;
+	std::shared_ptr<HttpServer>	server;
 };
 
 

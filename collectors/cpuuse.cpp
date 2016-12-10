@@ -31,6 +31,7 @@ public:
 		live["iowait"]	=atoi(raw[5].c_str());
 		live["irq"]	=atoi(raw[6].c_str());
 		live["softirq"]	=atoi(raw[7].c_str());
+		if (live["iowait"]>10000000) live["iowait"] = 0; // very high iowait sound too bogus to report and it polute gfx viewes
 		sum=0;
 		for(std::map<std::string,uint>::iterator i=live.begin();i!=live.end();i++) {
 			id = i->first;

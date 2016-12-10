@@ -322,35 +322,31 @@ void socketDetector::find(void) {
 
 	std::shared_ptr<servicesManager> mgr = services.lock();
 	if (!mgr) return;
-	// find all LISTEN TCP sockets
-	std::ifstream infile("/proc/net/tcp");
-	std::string line;
-	std::vector< std::shared_ptr<socket> > sockets;
-	while(infile.good() && getline(infile, line)) {
-		std::istringstream iss(line);
-		std::istream_iterator<std::string> beg(iss), end;
-		std::vector<std::string> tokens(beg,end);
-		if (tokens[3] != "0A")
-			continue; // keep only listening sockets
-		if (mgr->haveSocket(atoi(tokens[9].c_str())))
-			continue; // socket already associated to a service
-		sockets.push_back(std::make_shared<socket>(line, "tcp"));
-	}
-	if (infile.good())
-		infile.close();
+	std::map<std::string,std::string> files;
+	files["tcp"]  = "/proc/net/tcp";
+	files["udp"]  = "/proc/net/udp";
+	files["tcp6"] = "/proc/net/tcp6";
+	files["udp6"] = "/proc/net/udp6";
 
-	//Find all "listening" UDP sockets
-	std::ifstream unfile("/proc/net/udp");
-	while(unfile.good() && getline(unfile, line)) {
-		std::istringstream iss(line);
-		std::istream_iterator<std::string> beg(iss), end;
-		std::vector<std::string> tokens(beg,end);
-		if (tokens[3] != "07")
-			continue;
-		sockets.push_back(std::make_shared<socket>(line, "udp"));
+	std::vector< std::shared_ptr<socket> > sockets;
+	for (std::map<std::string,std::string>::iterator i=files.begin();i!=files.end();i++) {
+		std::ifstream infile(i->second);
+		std::string line;
+		while(infile.good() && getline(infile, line)) {
+			std::istringstream iss(line);
+			std::istream_iterator<std::string> beg(iss), end;
+			std::vector<std::string> tokens(beg,end);
+			if (tokens[3] != "0A" && i->first.substr(0,3) == "tcp")
+				continue; // keep only listening sockets
+			if (tokens[3] != "07" && i->first.substr(0,3) == "udp")
+				continue; // keep only listening sockets
+			if (mgr->haveSocket(atoi(tokens[9].c_str())))
+				continue; // socket already associated to a service
+			sockets.push_back(std::make_shared<socket>(line, i->first));
+		}
+		if (infile.good())
+			infile.close();
 	}
-	if (unfile.good())
-		unfile.close();
 
 	if (sockets.size()<1) 
 		return;

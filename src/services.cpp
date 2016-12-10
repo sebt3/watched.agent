@@ -31,8 +31,13 @@ socket::socket(std::string p_line, std::string p_type) : type(p_type) {
 	std::istringstream iss(p_line);
 	std::istream_iterator<std::string> beg(iss), end;
 	std::vector<std::string> tokens(beg,end);
-	setSockFrom(tokens[1], &(source));
-	setSockFrom(tokens[2], &(dest));
+	if (type == "tcp" || type == "udp") {
+		setSockFrom(tokens[1], &(source));
+		setSockFrom(tokens[2], &(dest));
+	} else {
+		setSockFrom6(tokens[1], &(source));
+		setSockFrom6(tokens[2], &(dest));
+	}
 	id = atoi(tokens[9].c_str());
 }
 
@@ -40,12 +45,23 @@ socket::socket(std::string p_source) {
 	char dot;
 	type = p_source.substr(0,p_source.find(":"));
 	auto pos = p_source.find(":")+3;
-	std::string port = p_source.substr(p_source.find(":",pos)+1);
+	std::string port = p_source.substr(p_source.rfind(":")+1);
 	source.port  = strtoul(port.c_str(), NULL, 10);
-	std::string ip = p_source.substr(pos, p_source.find(":",pos)-pos);
-	std::istringstream s(ip);
-	s>>source.ip1>>dot>>source.ip2>>dot>>source.ip3>>dot>>source.ip4;
-	//std::cout << "type = " <<type<< ", ip = " <<ip<< " port= " <<source.port<< std::endl;
+	std::string ip = p_source.substr(pos, p_source.rfind(":")-pos);
+	if (type == "tcp" || type == "udp") {
+		std::istringstream s(ip);
+		s>>source.ip1>>dot>>source.ip2>>dot>>source.ip3>>dot>>source.ip4;
+	} else {
+		pos = ip.find(":");
+		source.ip1 = strtoul(ip.substr(0,pos).c_str(), NULL, 16);
+		source.ip2 = strtoul(ip.substr(pos+1,ip.find(":",pos+1)).c_str(), NULL, 16);pos = ip.find(":",pos+1);
+		source.ip3 = strtoul(ip.substr(pos+1,ip.find(":",pos+1)).c_str(), NULL, 16);pos = ip.find(":",pos+1);
+		source.ip4 = strtoul(ip.substr(pos+1,ip.find(":",pos+1)).c_str(), NULL, 16);pos = ip.find(":",pos+1);
+		source.ip5 = strtoul(ip.substr(pos+1,ip.find(":",pos+1)).c_str(), NULL, 16);pos = ip.find(":",pos+1);
+		source.ip6 = strtoul(ip.substr(pos+1,ip.find(":",pos+1)).c_str(), NULL, 16);pos = ip.find(":",pos+1);
+		source.ip7 = strtoul(ip.substr(pos+1,ip.find(":",pos+1)).c_str(), NULL, 16);pos = ip.find(":",pos+1);
+		source.ip8 = strtoul(ip.substr(pos+1).c_str(), NULL, 16);
+	}
 }
 void socket::setSockFrom(std::string src, struct sock_addr *sa) {
 	std::string port = src.substr(src.find(":")+1, src.length());
@@ -55,9 +71,30 @@ void socket::setSockFrom(std::string src, struct sock_addr *sa) {
 	sa->ip2  = strtoul(src.substr(4,2).c_str(), NULL, 16);
 	sa->ip1  = strtoul(src.substr(6,2).c_str(), NULL, 16);
 }
+void socket::setSockFrom6(std::string src, struct sock_addr *sa) {
+	std::string buf;
+	std::string port = src.substr(src.find(":")+1, src.length());
+	sa->port = strtoul(port.c_str(), NULL, 16);
+	buf = src.substr( 2,2)+src.substr( 0,2);	sa->ip2  = strtoul(buf.c_str(), NULL, 16);
+	buf = src.substr( 6,2)+src.substr( 4,2);	sa->ip1  = strtoul(buf.c_str(), NULL, 16);
+	buf = src.substr(10,2)+src.substr( 8,2);	sa->ip4  = strtoul(buf.c_str(), NULL, 16);
+	buf = src.substr(14,2)+src.substr(12,2);	sa->ip3  = strtoul(buf.c_str(), NULL, 16);
+	buf = src.substr(18,2)+src.substr(16,2);	sa->ip6  = strtoul(buf.c_str(), NULL, 16);
+	buf = src.substr(22,2)+src.substr(20,2);	sa->ip5  = strtoul(buf.c_str(), NULL, 16);
+	buf = src.substr(26,2)+src.substr(24,2);	sa->ip8  = strtoul(buf.c_str(), NULL, 16);
+	buf = src.substr(30,2)+src.substr(28,2);	sa->ip7  = strtoul(buf.c_str(), NULL, 16);
+}
 
 std::string socket::getSource() {
-	std::string ret = type+"://"+std::to_string(source.ip1)+"."+std::to_string(source.ip2)+"."+std::to_string(source.ip3)+"."+std::to_string(source.ip4)+":"+std::to_string(source.port);
+	std::string ret;
+	if (type == "tcp" || type == "udp")
+		ret = type+"://"+std::to_string(source.ip1)+"."+std::to_string(source.ip2)+"."+std::to_string(source.ip3)+"."+std::to_string(source.ip4)+":"+std::to_string(source.port);
+	else {
+		std::stringstream stream;
+		stream << type+"://" << std::hex << source.ip1 << ":" << source.ip2 << ":" << source.ip3 << ":" << source.ip4 << ":" << source.ip5 << ":" << source.ip6 << ":" << source.ip7 << ":" << source.ip8  << ":"+std::to_string(source.port);
+
+		ret = stream.str();
+	}
 	return ret;
 }
 
@@ -261,7 +298,7 @@ void	service::setSocket(std::shared_ptr<socket> p_sock) {
 	if (sockets.size()==0 && uniqName=="") {
 		uniqName = p_sock->getSource();
 		uniqName.replace(uniqName.find(":"),3,"_");
-		uniqName.replace(uniqName.find(":"),1,"_");
+		uniqName.replace(uniqName.rfind(":"),1,"_");
 	}
 	sockets.push_back(p_sock);
 }
