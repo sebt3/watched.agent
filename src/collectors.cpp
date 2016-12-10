@@ -190,8 +190,8 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
 	}
 	std::stringstream stream;
         stream << server->getHead(desc[id]);
-	stream << "<div class=\"row\"><div class=\"col-md-12\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Graphics</h3></div><div class=\"box-body\"><div class=\"chart\"><div id=\"" << name_c << "-graph\"></div>\n</div></div></div></div></div>\n";
-        stream << server->getFoot("function updateLiveGraph("+name+"Graph) {\n  $.getJSON('"+basePath+name+"/"+id.c_str()+"/history', function(results) { "+name+"Graph.setData(results); });\n}\n"+name+"Graph = new Morris."+morrisType+"({element: '"+name+"-graph',  data: [], xkey: 'timestamp', pointSize:0,fillOpacity:0.3,"+morrisOpts+ressources[id]->getMorrisDesc()+"});\nupdateLiveGraph("+name+"Graph);setInterval(function() { updateLiveGraph("+name+"Graph); }, "+((*cfg)["history"].asString())+");\n");
+	stream << "<div class=\"row\"><div class=\"col-md-12\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Graphics</h3><div class=\"box-tools pull-right\"><button type=\"button\" class=\"btn btn-box-tool\" onclick=\"toggle();\"><i class=\"fa fa-square-o\" id=\"btn-refresh\"></i>refresh</button></div><div class=\"box-body\"><div class=\"chart\"><div id=\"" << name_c << "-graph\"></div>\n</div></div></div></div></div>\n";
+        stream << server->getFoot("var timerId = 0;var enable = false;var timerLen = "+((*cfg)["history"].asString())+";\nfunction start() { timerId = setInterval(function() { updateLiveGraph("+name+"Graph); }, timerLen); }\nfunction stop() { clearInterval(timerId); }\nfunction toggle() { if (enable) { stop();enable=false; $('#btn-refresh').removeClass('fa-check-square-o'); $('#btn-refresh').addClass('fa-square-o'); }else{ start();enable=true; $('#btn-refresh').removeClass('fa-square-o'); $('#btn-refresh').addClass('fa-check-square-o'); } }\nfunction updateLiveGraph("+name+"Graph) {\n  $.getJSON('"+basePath+name+"/"+id.c_str()+"/history', function(results) { "+name+"Graph.setData(results); });\n}\n"+name+"Graph = new Morris."+morrisType+"({element: '"+name+"-graph',  data: [], xkey: 'timestamp', hideHover: true,pointSize:0,fillOpacity:0.3,"+morrisOpts+ressources[id]->getMorrisDesc()+"});\nupdateLiveGraph("+name+"Graph);");
         setResponseHtml(response, stream.str());
 }
 
@@ -314,29 +314,31 @@ CollectorsManager::CollectorsManager(std::shared_ptr<HttpServer> p_server, std::
 	void *dlib;
 
 	dir = opendir(directory.c_str());
-	while ((ent = readdir(dir)) != NULL) {
-		const string file_name = ent->d_name;
-		const string full_file_name = directory + "/" + file_name;
+	if (dir != NULL) {
+		while ((ent = readdir(dir)) != NULL) {
+			const string file_name = ent->d_name;
+			const string full_file_name = directory + "/" + file_name;
 
-		if (file_name[0] == '.')
-			continue;
-		if (stat(full_file_name.c_str(), &st) == -1)
-			continue;
-		const bool is_directory = (st.st_mode & S_IFDIR) != 0;
-		if (is_directory)
-			continue;
+			if (file_name[0] == '.')
+				continue;
+			if (stat(full_file_name.c_str(), &st) == -1)
+				continue;
+			const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+			if (is_directory)
+				continue;
 
 
-		if (file_name.substr(file_name.rfind(".")) == ".so") {
-			dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
-			if(dlib == NULL){
-				cerr << dlerror() << endl; 
-				exit(-1);
+			if (file_name.substr(file_name.rfind(".")) == ".so") {
+				dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
+				if(dlib == NULL){
+					cerr << dlerror() << endl; 
+					exit(-1);
+				}
 			}
 		}
-	}
-	closedir(dir);
-	
+		closedir(dir);
+	} else	std::cerr << "Warning: " << directory << " doesnt exist. No collectors plugins will be used\n";
+
 	// Instanciate the plugins classes
 	for(factit = collectorFactory.begin();factit != collectorFactory.end(); factit++) {
 		collectors[factit->first]	= factit->second(server, cfg->getCollector(factit->first));
@@ -345,25 +347,27 @@ CollectorsManager::CollectorsManager(std::shared_ptr<HttpServer> p_server, std::
 	// Load the lua plugins
 	const string dirlua = (*servCfg)["collectors_lua"].asString();
 	dir = opendir(dirlua.c_str());
-	while ((ent = readdir(dir)) != NULL) {
-		const string file_name = ent->d_name;
-		const string name = file_name.substr(0,file_name.rfind("."));
-		const string full_file_name = dirlua + "/" + file_name;
+	if (dir != NULL) {
+		while ((ent = readdir(dir)) != NULL) {
+			const string file_name = ent->d_name;
+			const string name = file_name.substr(0,file_name.rfind("."));
+			const string full_file_name = dirlua + "/" + file_name;
 
-		if (file_name[0] == '.')
-			continue;
-		if (stat(full_file_name.c_str(), &st) == -1)
-			continue;
-		const bool is_directory = (st.st_mode & S_IFDIR) != 0;
-		if (is_directory)
-			continue;
+			if (file_name[0] == '.')
+				continue;
+			if (stat(full_file_name.c_str(), &st) == -1)
+				continue;
+			const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+			if (is_directory)
+				continue;
 
 
-		if (file_name.substr(file_name.rfind(".")) == ".lua") {
-			collectors[name] = std::make_shared<LuaCollector>(server, cfg->getCollector(name), full_file_name);
+			if (file_name.substr(file_name.rfind(".")) == ".lua") {
+				collectors[name] = std::make_shared<LuaCollector>(server, cfg->getCollector(name), full_file_name);
+			}
 		}
-	}
-	closedir(dir);
+		closedir(dir);
+	} else	std::cerr << "Warning: " << dirlua << " doesnt exist. No lua collectors will be used\n";
 }
 
 void CollectorsManager::startThreads() {

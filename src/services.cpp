@@ -422,7 +422,6 @@ bool	service::operator==(const std::string rhs) {
 }
 
 void	service::updateFrom(std::shared_ptr<service> src) {
-	//mainProcess.clear();
 	for(std::vector< std::shared_ptr<process> >::iterator i=src->mainProcess.begin();i!=src->mainProcess.end();i++) {
 		for(std::vector< std::shared_ptr<process> >::iterator j=mainProcess.begin();j!=mainProcess.end();j++) {
 			if (! (*j)->getStatus() && (*j)->getPath() == (*i)->getPath()) {

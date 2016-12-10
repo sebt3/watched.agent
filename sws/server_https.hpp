@@ -6,9 +6,11 @@
 #include <boost/lexical_cast.hpp>
 #include <openssl/ssl.h>
 
+
 namespace SimpleWeb {
     typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> HTTPS;    
     static const unsigned char ssl_session_ctx_id = 1;
+
     template<>
     class Server<HTTPS> : public ServerBase<HTTPS> {
     public:
@@ -19,6 +21,7 @@ namespace SimpleWeb {
                 context(boost::asio::ssl::context::tlsv12) { // 2016/08/13 only use tls12, see https://www.ssllabs.com/ssltest
             context.use_certificate_chain_file(cert_file);
             context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
+            
             if(verify_file.size()>0)
                 context.load_verify_file(verify_file);
             if(verify_certificate) {
@@ -33,23 +36,23 @@ namespace SimpleWeb {
         void accept() {
             //Create new socket for this connection
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
-            std::shared_ptr<HTTPS> socket(new HTTPS(*io_service, context));
+            auto socket=std::make_shared<HTTPS>(*io_service, context);
 
             acceptor->async_accept((*socket).lowest_layer(), [this, socket](const boost::system::error_code& ec) {
-                //Immediately start accepting a new connection
-                accept();
+                //Immediately start accepting a new connection (if io_service hasn't been stopped)
+                if (ec != boost::asio::error::operation_aborted)
+                    accept();
+
                 
                 if(!ec) {
                     boost::asio::ip::tcp::no_delay option(true);
                     socket->lowest_layer().set_option(option);
                     
                     //Set timeout on the following boost::asio::ssl::stream::async_handshake
-                    std::shared_ptr<boost::asio::deadline_timer> timer;
-                    if(timeout_request>0)
-                        timer=set_timeout_on_socket(socket, timeout_request);
+                    auto timer=get_timeout_timer(socket, timeout_request);
                     (*socket).async_handshake(boost::asio::ssl::stream_base::server, [this, socket, timer]
                             (const boost::system::error_code& ec) {
-                        if(timeout_request>0)
+                        if(timer)
                             timer->cancel();
                         if(!ec)
                             read_request_and_content(socket);

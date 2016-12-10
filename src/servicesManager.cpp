@@ -39,49 +39,53 @@ void servicesManager::init() {
 
 	// Load the services configuration
 	dir = opendir(directory.c_str());
-	while ((ent = readdir(dir)) != NULL) {
-		const std::string file_name = ent->d_name;
-		const std::string full_file_name = directory + "/" + file_name;
+	if (dir != NULL) {
+		while ((ent = readdir(dir)) != NULL) {
+			const std::string file_name = ent->d_name;
+			const std::string full_file_name = directory + "/" + file_name;
 
-		if (file_name[0] == '.')
-			continue;
-		if (stat(full_file_name.c_str(), &st) == -1)
-			continue;
-		const bool is_directory = (st.st_mode & S_IFDIR) != 0;
-		if (is_directory)
-			continue;
+			if (file_name[0] == '.')
+				continue;
+			if (stat(full_file_name.c_str(), &st) == -1)
+				continue;
+			const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+			if (is_directory)
+				continue;
 
-		if (file_name.substr(file_name.rfind(".")) == ".json") {
-			services.push_back(std::make_shared<service>(full_file_name));
+			if (file_name.substr(file_name.rfind(".")) == ".json") {
+				services.push_back(std::make_shared<service>(full_file_name));
+			}
 		}
-	}
-	closedir(dir);
+		closedir(dir);
+	}  else	std::cerr << "Warning: " << directory << " doesnt exist. No services configuration will be loaded\n";
 
 	// Load the services plugins
 	directory = (*servCfg)["services_cpp"].asString();
 	dir = opendir(directory.c_str());
-	while ((ent = readdir(dir)) != NULL) {
-		const std::string file_name = ent->d_name;
-		const std::string full_file_name = directory + "/" + file_name;
+	if (dir != NULL) {
+		while ((ent = readdir(dir)) != NULL) {
+			const std::string file_name = ent->d_name;
+			const std::string full_file_name = directory + "/" + file_name;
 
-		if (file_name[0] == '.')
-			continue;
-		if (stat(full_file_name.c_str(), &st) == -1)
-			continue;
-		const bool is_directory = (st.st_mode & S_IFDIR) != 0;
-		if (is_directory)
-			continue;
+			if (file_name[0] == '.')
+				continue;
+			if (stat(full_file_name.c_str(), &st) == -1)
+				continue;
+			const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+			if (is_directory)
+				continue;
 
 
-		if (file_name.substr(file_name.rfind(".")) == ".so") {
-			dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
-			if(dlib == NULL){
-				std::cerr << dlerror() << std::endl; 
-				exit(-1);
+			if (file_name.substr(file_name.rfind(".")) == ".so") {
+				dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
+				if(dlib == NULL){
+					std::cerr << dlerror() << std::endl; 
+					exit(-1);
+				}
 			}
 		}
-	}
-	closedir(dir);
+		closedir(dir);
+	} else	std::cerr << "Warning: " << directory << " doesnt exist. No services plugins will be used\n";
 	
 	// Instanciate the detector classes
 	for(std::map<std::string, detector_maker_t* >::iterator factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
@@ -136,7 +140,6 @@ void servicesManager::addService(std::shared_ptr<service> p_serv) {
 	// Detect if this is a missing part of a service
 	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++){
 		if ((*i)->needSocketFrom(add) ) {
-			std::cout << "updating service\n";
 			(*i)->updateFrom(add);
 			return;
 		}

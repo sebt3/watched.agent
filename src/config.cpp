@@ -26,7 +26,7 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 		data["server"]["host"].setComment(std::string("/*\t\tHost string to listen on (default: all interfaces) */"), Json::commentAfterOnSameLine);
 	}
 	if (! data["server"].isMember("port")) {
-		data["server"]["port"] = 9080;
+		data["server"]["port"] = 9082;
 		data["server"]["port"].setComment(std::string("/*\t\tTCP port number */"), Json::commentAfterOnSameLine);
 	}
 	if (! data["server"].isMember("web_root")) {

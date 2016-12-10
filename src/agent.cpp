@@ -53,6 +53,9 @@ typedef std::shared_ptr<SWHttpServer::Request> request_ptr_h;
 typedef std::shared_ptr<SWHttpsServer::Response> response_ptr_s;
 typedef std::shared_ptr<SWHttpsServer::Request> request_ptr_s;
 
+//TODO : add support for HTTP caching, see https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching?hl=fr
+
+
 HttpServer::HttpServer(Json::Value* p_cfg) : cfg(p_cfg) {
 	struct stat buffer;
 	int port_i		= (*cfg)["port"].asInt();
