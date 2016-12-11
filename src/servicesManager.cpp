@@ -86,7 +86,7 @@ void servicesManager::init() {
 		}
 		closedir(dir);
 	} else	std::cerr << "Warning: " << directory << " doesnt exist. No services plugins will be used\n";
-	
+
 	// Instanciate the detector classes
 	for(std::map<std::string, detector_maker_t* >::iterator factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
 		detectors.push_back(factit->second(shared_from_this(), server));
@@ -96,6 +96,34 @@ void servicesManager::init() {
 		enhancers.push_back(factit->second(shared_from_this()));
 
 	detectors.push_back(std::make_shared<socketDetector>(shared_from_this(), server));
+
+	// Load the lua plugins
+	const std::string dirlua = (*servCfg)["services_lua"].asString();
+	dir = opendir(dirlua.c_str());
+	if (dir != NULL) {
+		while ((ent = readdir(dir)) != NULL) {
+			const std::string file_name = ent->d_name;
+			const std::string name = file_name.substr(0,file_name.rfind("."));
+			const std::string full_file_name = dirlua + "/" + file_name;
+
+			if (file_name[0] == '.')
+				continue;
+			if (stat(full_file_name.c_str(), &st) == -1)
+				continue;
+			const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+			if (is_directory)
+				continue;
+
+			if (file_name.substr(file_name.rfind(".")) == ".lua") {
+				/* TODO: do something with the found file
+				collectors[name] = std::make_shared<LuaCollector>(server, cfg->getCollector(name), full_file_name);
+				*/
+			}
+		}
+		closedir(dir);
+	} else	std::cerr << "Warning: " << dirlua << " doesnt exist. No lua services plugins will be used\n";
+
+
 	systemCollectors	= std::make_shared<CollectorsManager>(server,cfg);
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	associate(server,"GET","^/$",doGetRootPage);
@@ -322,8 +350,6 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
  * Detectors  
  */
 void socketDetector::find(void) {
-	//TODO: add suport for ipv6 sockets
-
 	std::shared_ptr<servicesManager> mgr = services.lock();
 	if (!mgr) return;
 	std::map<std::string,std::string> files;

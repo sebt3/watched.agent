@@ -244,6 +244,15 @@ service::service(const service& p_src) {
 	setDefaultHost();
 }
 
+std::shared_ptr< std::vector<uint32_t> >	service::getPIDs() {
+	std::shared_ptr< std::vector<uint32_t> > ret = std::make_shared<std::vector<uint32_t>>();
+
+	for (std::vector< std::shared_ptr<process> >::iterator i = mainProcess.begin();i!=mainProcess.end();i++)
+		ret->push_back((*i)->getPID());
+
+	return ret;
+}
+
 void	service::setDefaultHost() {
 	if (host != "") return;
 	struct addrinfo hints, *info;//, *p;
@@ -256,7 +265,7 @@ void	service::setDefaultHost() {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_CANONNAME;
 	if ((gai_result = getaddrinfo(ghost, "http", &hints, &info)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(gai_result));
+		std::cerr << "getaddrinfo: " << gai_strerror(gai_result) << std::endl;
 		return;
 	}
 	/*for(p = info; p != NULL; p = p->ai_next) {
@@ -286,10 +295,25 @@ void	service::setDefaultConfig() {
 	cfg["host"] = host;
 }
 
+Json::Value* 	service::getCollectorCfg(std::string p_name) {
+	Json::Value obj_value(Json::objectValue);
+	if(! cfg.isMember("collectors")) {
+		cfg["collectors"][p_name] = obj_value;
+		cfg["collectors"].setComment(std::string("/*\tConfigure the collectors plugins */"), Json::commentBefore);
+	}else if(! cfg["collectors"].isMember(p_name) ) {
+		cfg["collectors"][p_name] = obj_value;
+	}
+	return &(cfg["collectors"][p_name]); 
+}
+
 void	service::saveConfigTemplate(std::string p_cfg_dir){
 	setDefaultConfig();
 	std::string fname = p_cfg_dir+std::string("/")+name+"-"+uniqName+std::string(".json.template");
 	std::ofstream cfgof (fname, std::ifstream::out);
+	if (!cfgof) {
+		std::cerr << "Warning: Cannot write on " << fname << ". Service configuration template NOT updated\n";
+		return;
+	}
 	cfgof<<cfg;
 	cfgof.close();
 }
@@ -422,6 +446,7 @@ bool	service::operator==(const std::string rhs) {
 }
 
 void	service::updateFrom(std::shared_ptr<service> src) {
+	// Copy the process
 	for(std::vector< std::shared_ptr<process> >::iterator i=src->mainProcess.begin();i!=src->mainProcess.end();i++) {
 		for(std::vector< std::shared_ptr<process> >::iterator j=mainProcess.begin();j!=mainProcess.end();j++) {
 			if (! (*j)->getStatus() && (*j)->getPath() == (*i)->getPath()) {
@@ -432,6 +457,7 @@ void	service::updateFrom(std::shared_ptr<service> src) {
 
 		addMainProcess((*i));
 	}
+	// Copy the sockets
 	for(std::vector< std::shared_ptr<socket> >::iterator i=src->sockets.begin();i!=src->sockets.end();i++) {
 		for(std::vector< std::shared_ptr<socket> >::iterator j=sockets.begin();j!=sockets.end();j++) {
 			if ((*j)->getSource() == (*i)->getSource()) {
@@ -442,7 +468,14 @@ void	service::updateFrom(std::shared_ptr<service> src) {
 
 		setSocket((*i));
 	}
-	// TODO: should update sockets too
+
+	// TODO: copy the collectors, updating the service too
+
+	// TODO: copy the configuration, not just the collectors conf
+	for (Json::Value::iterator j = src->cfg["collectors"].begin();j!=src->cfg["collectors"].end();j++) {
+		cfg["collectors"][j.key().asString()] = *j;
+	}
+
 }
 
 }

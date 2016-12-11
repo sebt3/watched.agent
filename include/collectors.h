@@ -76,7 +76,7 @@ private:
 class service;
 class Collector {
 public:
-	Collector(std::string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history = 300, uint p_freq_pool = 5);
+	Collector(std::string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history = 300, uint p_freq_pool = 5, std::shared_ptr<service> p_serv = nullptr);
 	~Collector();
 	void startThread();
 	
@@ -86,7 +86,7 @@ public:
 	void doGetGraph(response_ptr response, request_ptr request);
 	void getDefinitions(Json::Value* p_defs);
 	void getPaths(Json::Value* p_defs);
-	void setService(std::shared_ptr<service> p_serv) { onService = p_serv; }
+	void setService(std::shared_ptr<service> p_serv);
 	std::string getHost();
 	void getIndexHtml(std::stringstream& stream );
 protected:
@@ -101,6 +101,7 @@ protected:
 	std::string			basePath;
 	std::string			host;
 	std::weak_ptr<service>		onService;
+	bool				haveService;
 private:
 	bool				active;
 	std::thread			my_thread;

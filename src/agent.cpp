@@ -4,6 +4,11 @@
 using namespace watcheD;
 
 #include <boost/filesystem.hpp>
+#include <openssl/sha.h>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <string>
 
 
 const std::string SERVER_HEAD="watched.agent/0.1";
@@ -11,6 +16,26 @@ const std::string APPS_NAME="watched.agent";
 const std::string APPS_DESC="Watch over wasted being washed up";
 #include "config.h"
 
+std::string sha256(const std::string p_fname) {
+	std::string ret = "";
+	unsigned char hash[SHA256_DIGEST_LENGTH];
+	std::ifstream file(p_fname, std::ios::binary | std::ios::ate);
+	std::streamsize size = file.tellg();
+	file.seekg(0, std::ios::beg);
+	std::vector<char> buffer(size);
+	if (!file.read(buffer.data(), size))
+		return ret;
+
+	SHA256_CTX sha256;
+	SHA256_Init(&sha256);
+	SHA256_Update(&sha256, reinterpret_cast<char*> (&buffer[0]), size);
+	SHA256_Final(hash, &sha256);
+	std::stringstream ss;
+	for(int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+		ss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
+	}
+	return ss.str();
+}
 
 void default_resource_send(std::shared_ptr<SWHttpServer> server, std::shared_ptr<SWHttpServer::Response> response,
                            std::shared_ptr<std::ifstream> ifs, std::shared_ptr<std::vector<char> > buffer) {
@@ -53,9 +78,6 @@ typedef std::shared_ptr<SWHttpServer::Request> request_ptr_h;
 typedef std::shared_ptr<SWHttpsServer::Response> response_ptr_s;
 typedef std::shared_ptr<SWHttpsServer::Request> request_ptr_s;
 
-//TODO : add support for HTTP caching, see https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching?hl=fr
-
-
 HttpServer::HttpServer(Json::Value* p_cfg) : cfg(p_cfg) {
 	struct stat buffer;
 	int port_i		= (*cfg)["port"].asInt();
@@ -82,7 +104,16 @@ HttpServer::HttpServer(Json::Value* p_cfg) : cfg(p_cfg) {
 					path/="index.html";
 				if(!(boost::filesystem::exists(path) && boost::filesystem::is_regular_file(path)))
 					throw std::invalid_argument("file does not exist");
-				
+
+				std::string hash = sha256(path.string());
+				auto it=request->header.find("If-None-Match");
+				if(it!=request->header.end()) {
+					if (it->second == "\""+hash+"\"") {
+						*response << "HTTP/1.1 304 Not Modified\r\nCache-Control: max-age=86400\r\nETag: \""+hash+"\"\r\n\r\n";
+						return;
+					}
+				}
+
 				auto ifs=std::make_shared<std::ifstream>();
 				ifs->open(path.string(), std::ifstream::in | std::ios::binary);
 				
@@ -96,7 +127,7 @@ HttpServer::HttpServer(Json::Value* p_cfg) : cfg(p_cfg) {
 					
 					ifs->seekg(0, std::ios::beg);
 					
-					*response << "HTTP/1.1 200 OK\r\nContent-Length: " << length << "\r\n\r\n";
+					*response << "HTTP/1.1 200 OK\r\nCache-Control: max-age=86400\r\nETag: \""+hash+"\"\r\nContent-Length: " << length << "\r\n\r\n";
 					defaults_resource_send(https, response, ifs, buffer);
 				}
 				else
@@ -122,7 +153,16 @@ HttpServer::HttpServer(Json::Value* p_cfg) : cfg(p_cfg) {
 					path/="index.html";
 				if(!(boost::filesystem::exists(path) && boost::filesystem::is_regular_file(path)))
 					throw std::invalid_argument("file does not exist");
-				
+
+				std::string hash = sha256(path.string());
+				auto it=request->header.find("If-None-Match");
+				if(it!=request->header.end()) {
+					if (it->second == "\""+hash+"\"") {
+						*response << "HTTP/1.1 304 Not Modified\r\nCache-Control: max-age=86400\r\nETag: \""+hash+"\"\r\n\r\n";
+						return;
+					}
+				}
+
 				auto ifs=std::make_shared<std::ifstream>();
 				ifs->open(path.string(), std::ifstream::in | std::ios::binary);
 				

@@ -79,6 +79,7 @@ file (GLOB      AGENT_SOURCE_FILES "src/*.cpp")
 file (GLOB COLLECTORS_SOURCE_FILES "collectors/*.cpp" )
 file (GLOB   SERVICES_SOURCE_FILES "services/*.cpp" )
 file (GLOB    LUA_COLLECTORS_FILES "luaCollectors/*.lua" )
+file (GLOB      LUA_SERVICES_FILES "luaServices/*.lua" )
 
 include_directories (${CMAKE_CURRENT_SOURCE_DIR}/sws ${CMAKE_CURRENT_SOURCE_DIR}/include)
 configure_file ("${PROJECT_SOURCE_DIR}/include/config.h.in"
@@ -125,6 +126,9 @@ install(FILES "include/services.h" DESTINATION include/watched)
 foreach( collector_lua ${LUA_COLLECTORS_FILES} )
 	install(FILES ${collector_lua} DESTINATION lib/watched/collectors.lua)
 endforeach( collector_lua ${LUA_COLLECTORS_FILES} )
+foreach( srv_lua ${LUA_SERVICES_FILES} )
+	install(FILES ${srv_lua} DESTINATION lib/watched/services.lua)
+endforeach( srv_lua ${LUA_SERVICES_FILES} )
 
 # installing webroot files
 install(DIRECTORY webroot DESTINATION lib/watched)

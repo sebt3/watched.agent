@@ -102,6 +102,8 @@ public:
 	void		getIndexHtml(std::stringstream& stream );
 	void		getJsonStatus(Json::Value* ref);
 	void		getJson(Json::Value* p_defs);
+	Json::Value* 	getCollectorCfg(std::string p_name);
+	std::shared_ptr< std::vector<uint32_t> >	getPIDs();
 protected:
 	void		setDefaultConfig();
 	void		setDefaultHost();

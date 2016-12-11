@@ -26,7 +26,7 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 		data["server"]["host"].setComment(std::string("/*\t\tHost string to listen on (default: all interfaces) */"), Json::commentAfterOnSameLine);
 	}
 	if (! data["server"].isMember("port")) {
-		data["server"]["port"] = 9082;
+		data["server"]["port"] = 9080;
 		data["server"]["port"].setComment(std::string("/*\t\tTCP port number */"), Json::commentAfterOnSameLine);
 	}
 	if (! data["server"].isMember("web_root")) {
@@ -66,6 +66,10 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 		data["plugins"]["services_cpp"] = WATCHED_DLL_SRV;
 		data["plugins"]["services_cpp"].setComment(std::string("/*\t\tThe directory where the *.so services plugins are stored*/"), Json::commentAfterOnSameLine);
 	}
+	if (! data["plugins"].isMember("services_lua")) {
+		data["plugins"]["services_lua"] = WATCHED_LUA_SRV;
+		data["plugins"]["services_lua"].setComment(std::string("/*\t\tThe directory where the *.lua services plugins are stored */"), Json::commentAfterOnSameLine);
+	}
 	if (! data["plugins"].isMember("collectors_cpp")) {
 		data["plugins"]["collectors_cpp"] = WATCHED_DLL_COLL;
 		data["plugins"]["collectors_cpp"].setComment(std::string("/*\t\tThe directory where the *.so collector plugins are stored*/"), Json::commentAfterOnSameLine);
@@ -78,6 +82,10 @@ Config::Config(std::string p_fname) : fname(p_fname) {
 
 void 		Config::save() {
 	std::ofstream cfgof (fname, std::ifstream::out);
+	if (!cfgof) {
+		std::cerr << "Warning: Cannot write on " << fname << ". Configuration NOT updated\n";
+		return;
+	}
 	cfgof<<data;
 	cfgof.close();
 }

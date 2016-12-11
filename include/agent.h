@@ -50,7 +50,7 @@ private:
  */
 class LuaCollector : public Collector {
 public:
-	LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, const std::string p_fname);
+	LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, const std::string p_fname, std::shared_ptr<service> p_serv = nullptr);
 
 	void collect();
 	void addRes(std::string p_name, std::string p_desc, std::string p_typeName);
@@ -58,6 +58,7 @@ public:
 	void nextVal(std::string p_res);
 	void setProp(std::string p_res, std::string p_name, int val);
 	void setPropD(std::string p_res, std::string p_name, double val);
+	void getPIDList();
 	std::string getName(){ return name; }
 private:
 	sel::State state{true};

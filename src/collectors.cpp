@@ -40,8 +40,8 @@ string  Ressource::getHistory(double since) {
 	stringstream ss;
 	bool splitted = true;
 	ss << "[\n";
-	if (v.size()>1) for(uint i=v.size()-1;i>0;i--) {
-		if (v[i].isMember("timestamp") && v[i]["timestamp"].asDouble() > since) {
+	if (v.size()>=1) for(int i=v.size();i>=0;i--) {
+		if (v[i].isMember("timestamp") && v[i]["timestamp"].asDouble() >= since) {
 			if (!splitted) {
 				ss << ",\n";
 			}
@@ -83,7 +83,7 @@ void Ressource::getDefinition(Json::Value* p_defs) {
  * Collector
  */
 
-Collector::Collector(string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), basePath("/system/"), active(false),  server(p_server) {
+Collector::Collector(string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool, std::shared_ptr<service> p_serv): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), basePath("/system/"), haveService(false), active(false),  server(p_server) {
 	if(! cfg->isMember("history") && p_history>0) {
 		(*cfg)["history"] = p_history;
 		(*cfg)["history"].setComment(std::string("/*\t\tNumber of elements to keep*/"), Json::commentAfterOnSameLine);
@@ -96,13 +96,23 @@ Collector::Collector(string p_name, std::shared_ptr<HttpServer> p_server, Json::
 		(*cfg)["enable"] = true;
 		(*cfg)["enable"].setComment(std::string("/*\t\tEnable this plugin ?*/"), Json::commentAfterOnSameLine);
 	}
+	if( p_serv != nullptr )
+		setService(p_serv);
 }
+
 Collector::~Collector() {
 	if (active) {
 		active=false;
 		my_thread.join();
 	}
 }
+
+void Collector::setService(std::shared_ptr<service> p_serv) {
+	onService	= p_serv;
+	haveService	= true;
+	basePath	= "/service/"+p_serv->getID()+"/";
+}
+
 void Collector::startThread() {
 	if (!active && (*cfg)["enable"].asBool()) {
 		active=true;

@@ -3,7 +3,8 @@
 	{
 		"collectors_cpp" : "@CMAKE_INSTALL_PREFIX@/lib/watched/collectors.cpp", /*	The directory where the *.so collector plugins are stored*/
 		"collectors_lua" : "@CMAKE_INSTALL_PREFIX@/lib/watched/collectors.lua", /*	The directory where the *.lua collector plugins are stored*/
-		"services_cpp" : "@CMAKE_INSTALL_PREFIX@/lib/watched/services.cpp" /*		The directory where the *.so services plugins are stored*/
+		"services_cpp" : "@CMAKE_INSTALL_PREFIX@/lib/watched/services.cpp", /*		The directory where the *.so services plugins are stored*/
+		"services_lua" : "@CMAKE_INSTALL_PREFIX@/lib/watched/services.lua" /*		The directory where the *.lua services plugins are stored*/
 	},
 	"services":
 	{
