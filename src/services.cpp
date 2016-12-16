@@ -203,11 +203,11 @@ std::string	process::getCWD() {
 /*********************************
  * Services
  */
-service::service(): name(""), host(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL) {
+service::service(std::shared_ptr<HttpServer> p_server): name(""), host(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), server(p_server) {
 	setDefaultHost();
 }
 
-service::service(std::string p_file_path): name(""), host(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), cfgFile(p_file_path) {
+service::service(std::shared_ptr<HttpServer> p_server, std::string p_file_path): name(""), host(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), cfgFile(p_file_path), server(p_server) {
 	std::ifstream cfgif (cfgFile);
 	if (cfgif.good()) {
 		cfgif >> cfg;
@@ -235,14 +235,37 @@ service::service(const service& p_src) {
 	type	= p_src.type;
 	cfg	= p_src.cfg;
 	cfgFile = p_src.cfgFile;
+	server	= p_src.server;
 	for(std::vector< std::shared_ptr<socket> >::const_iterator i=p_src.sockets.begin();i!=p_src.sockets.end();i++)
 		sockets.push_back(*i);
 	for(std::vector< std::shared_ptr<process> >::const_iterator i=p_src.mainProcess.begin();i!=p_src.mainProcess.end();i++)
 		mainProcess.push_back(*i);
-	for(std::vector< std::shared_ptr<Collector> >::const_iterator i=p_src.collectors.begin();i!=p_src.collectors.end();i++)
-		collectors.push_back(*i);
+	for(std::map< std::string, std::shared_ptr<Collector> >::const_iterator i=p_src.collectors.begin();i!=p_src.collectors.end();i++)
+		if (collectors.find(i->first) == collectors.end())
+			collectors[i->first] = i->second;
 	setDefaultHost();
 }
+
+void	service::addCollector(const std::string p_name) {
+	if ( collectors.find(p_name) != collectors.end())
+		return; // already added
+	if ( serviceCollectorFactory.find(p_name) == serviceCollectorFactory.end())
+		return; // no factory matching this name
+	collectors[p_name] = serviceCollectorFactory[p_name].first(server, getCollectorCfg(p_name), shared_from_this(), serviceCollectorFactory[p_name].second);
+	collectors[p_name]->startThread();
+}
+
+std::shared_ptr<Collector>	service::getCollector(std::string p_name) {
+	if ( collectors.find(p_name) == collectors.end())
+		return nullptr; // not existing
+	return collectors[p_name];
+}
+
+void	service::getCollectorsHtml(std::stringstream& stream) {
+	for(std::map< std::string, std::shared_ptr<Collector> >::iterator i=collectors.begin();i!=collectors.end();i++)
+		i->second->getIndexHtml(stream);
+}
+
 
 std::shared_ptr< std::vector<uint32_t> >	service::getPIDs() {
 	std::shared_ptr< std::vector<uint32_t> > ret = std::make_shared<std::vector<uint32_t>>();
@@ -383,6 +406,11 @@ void	service::getJsonStatus(Json::Value* ref) {
 		}
 	}
 	(*ref)["host"] = host;
+	(*ref)["properties"]["host"] = host;
+	(*ref)["properties"]["name"] = name;
+	(*ref)["properties"]["type"] = type;
+	(*ref)["properties"]["subType"] = subType;
+	(*ref)["properties"]["uniqName"] = uniqName;
 }
 
 void	service::getIndexHtml(std::stringstream& stream ) {
@@ -409,6 +437,10 @@ void	service::getJson(Json::Value* p_defs) {
 	(*p_defs)["paths"][p]["get"]["responses"]["200"]["schema"]["$ref"] = "#/definitions/services";
 	(*p_defs)["paths"][p]["get"]["responses"]["200"]["description"] = name+" status";
 	(*p_defs)["paths"][p]["get"]["summary"] = name+" service status";
+	for(std::map< std::string, std::shared_ptr<Collector> >::iterator i=collectors.begin();i!=collectors.end();i++) {
+		i->second->getDefinitions(&((*p_defs)["definitions"]));
+		i->second->getPaths(&((*p_defs)["paths"]));
+	}
 }
 
 bool	service::haveSocket(std::string p_source) const {

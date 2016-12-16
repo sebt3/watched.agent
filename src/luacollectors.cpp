@@ -60,4 +60,53 @@ void LuaCollector::collect() {
 	state["collect"]();
 }
 
+
+
+
+
+/*********************************
+ * LuaSorter
+ */
+LuaSorter::LuaSorter(const std::string p_fname) {
+	state.Load(p_fname);
+}
+
+bool LuaSorter::isType(const std::string p_typename) {
+	sel::Selector types = state["types"];
+	std::string x="x";
+	for(int i=1;x!="";i++) {
+		std::string y = types[i];
+		x = y;
+		if (y== p_typename)
+			return true;
+	}
+	return false;
+}
+
+/*********************************
+ * LuaServiceEnhancer
+ */
+LuaServiceEnhancer::LuaServiceEnhancer(std::shared_ptr<servicesManager> p_sm, const std::string p_fname): serviceEnhancer(p_sm) {
+	state.Load(p_fname);
+}
+
+std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_serv) {
+	state["p_serv"].SetObj(*p_serv,
+		"addCollector",	&service::addCollector,
+		"havePID",	&service::havePID,
+		"getType",	&service::getType,
+		"getSubType",	&service::getSubType,
+		"getName",	&service::getName,
+		"getID",	&service::getID,
+		"setType",	&service::setType,
+		"setSubType",	&service::setSubType,
+		"setUniqKey",	&service::setUniqKey,
+		"setHost",	&service::setHost,
+		"setName",	&service::setName
+	);
+
+	state("enhance(p_serv)");
+	return nullptr;
+}
+
 }

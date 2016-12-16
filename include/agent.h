@@ -64,6 +64,29 @@ private:
 	sel::State state{true};
 };
 
+/*********************************
+ * LuaSorter
+ * find what type of service management plugin a lua file contain
+ */
+class LuaSorter {
+public:
+	LuaSorter(const std::string p_fname);
+	bool isType(const std::string p_typename);
+private:
+	sel::State state{true};
+};
+
+/*********************************
+ * LuaServiceEnhancer
+ */
+class LuaServiceEnhancer: public serviceEnhancer {
+public:
+	LuaServiceEnhancer(std::shared_ptr<servicesManager> p_sm, const std::string p_fname);
+	std::shared_ptr<service> enhance(std::shared_ptr<service> p_serv);
+private:
+	sel::State state{true};
+};
+
 
 /*********************************
  * ServicesManager
@@ -73,6 +96,7 @@ private:
 class servicesManager : public std::enable_shared_from_this<servicesManager> {
 public:
 	servicesManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg);
+	~servicesManager();
 	void	init();
 	void	find();
 	void	addService(std::shared_ptr<service> p_serv);
@@ -81,6 +105,8 @@ public:
 	void	doGetJson(response_ptr response, request_ptr request);
 	void	doGetServiceStatus(response_ptr response, request_ptr request);
 	void	doGetServiceHtml(response_ptr response, request_ptr request);
+	void	doGetCollectorHistory(response_ptr response, request_ptr request);
+	void	doGetCollectorGraph(response_ptr response, request_ptr request);
 	void	doGetRootPage(response_ptr response, request_ptr request);
 	void	startThreads();
 	std::shared_ptr<service> enhanceFromFactory(std::string p_id, std::shared_ptr<service> p_serv);

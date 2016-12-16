@@ -72,10 +72,10 @@ private:
  * Services
  */
 class serviceHandler;
-class service {
+class service: public std::enable_shared_from_this<service> {
 public:
-	service();
-	service(std::string p_file_path);
+	service(std::shared_ptr<HttpServer> p_server);
+	service(std::shared_ptr<HttpServer> p_server, std::string p_file_path);
 	service(const service& p_src);
 	void		updateFrom(std::shared_ptr<service> src);
 
@@ -88,6 +88,7 @@ public:
 	bool		haveHandler() { return handler != NULL; }
 	bool		needSocketFrom(std::shared_ptr<service> p_service);
 	std::string	getType() { return type; }
+	std::string	getSubType() { return subType; }
 	std::string	getName() { return name; }
 	std::string	getID() { return name+"-"+uniqName; }
 
@@ -95,14 +96,19 @@ public:
 	void 		addMainProcess(std::shared_ptr<process> p_p);
 	void		setHandler(std::shared_ptr<serviceHandler> p_h) { handler = p_h; }
 	void		setType(std::string p_type) { type=p_type; }
+	void		setSubType(std::string p_type) { subType=p_type; }
 	void		setHost(std::string p_host) { host=p_host; }
 	void		setName(std::string p_name) { name=p_name; }
+	void		setUniqKey(std::string p_key) { uniqName=p_key; }
 
 	void		saveConfigTemplate(std::string p_cfg_dir);
 	void		getIndexHtml(std::stringstream& stream );
 	void		getJsonStatus(Json::Value* ref);
 	void		getJson(Json::Value* p_defs);
+	void		addCollector(const std::string p_name);
+	std::shared_ptr<Collector>	getCollector(std::string p_name);
 	Json::Value* 	getCollectorCfg(std::string p_name);
+	void		getCollectorsHtml(std::stringstream& stream );
 	std::shared_ptr< std::vector<uint32_t> >	getPIDs();
 protected:
 	void		setDefaultConfig();
@@ -110,6 +116,7 @@ protected:
 	std::string					name;
 	std::string					host;
 	std::string					type;
+	std::string					subType;
 	std::string					uniqName;
 	Json::Value					cfg;
 	std::shared_ptr<serviceHandler>			handler;
@@ -117,8 +124,9 @@ private:
 	std::string					cfgFile;
 	std::vector< std::shared_ptr<socket> >		sockets;
 	std::vector< std::shared_ptr<process> >		mainProcess;
-	std::vector< std::shared_ptr<Collector> >	collectors;
+	std::map< std::string, std::shared_ptr<Collector> >	collectors;
 	//std::vector< std::shared_ptr<process> >	subProcess;
+	std::shared_ptr<HttpServer>			server;
 };
 
 
@@ -177,11 +185,24 @@ typedef std::shared_ptr<service>         service_maker_t(const service& p_src);
 typedef std::shared_ptr<serviceHandler>  handler_maker_t(std::shared_ptr<service> p_s);
 typedef std::shared_ptr<serviceDetector> detector_maker_t(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server);
 typedef std::shared_ptr<serviceEnhancer> enhancer_maker_t(std::shared_ptr<servicesManager> p_sm);
+typedef std::shared_ptr<Collector> 	 service_collector_maker_t(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string p_filename);
 extern std::map<std::string, service_maker_t* >  serviceFactory;
 extern std::map<std::string, handler_maker_t* >  handlerFactory;
 extern std::map<std::string, detector_maker_t* > detectorFactory;
 extern std::map<std::string, enhancer_maker_t* > enhancerFactory;
+extern std::map<std::string, std::pair<service_collector_maker_t*,std::string> > serviceCollectorFactory;
 }
+
+#define MAKE_PLUGIN_SERVICE_COLLECTOR(className,id)				\
+extern "C" {									\
+std::shared_ptr<Collector> makerSCol_##id(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s){	\
+   return std::make_shared<className>(p_srv, p_cfg, p_s);			\
+}										\
+}										\
+class proxySCol_##id { public:							\
+   proxySCol_##id(){ serviceCollectorFactory[#id] = std::make_pair(makerSCol_##id,""); }		\
+};										\
+proxySCol_##id p;
 
 #define MAKE_PLUGIN_SERVICE(className,id)					\
 extern "C" {									\

@@ -26,8 +26,7 @@ std::map<std::string, detector_maker_t* > detectorFactory;
 std::map<std::string, enhancer_maker_t* > enhancerFactory;
 std::map<std::string, handler_maker_t*  >  handlerFactory;
 std::map<std::string, service_maker_t*  >  serviceFactory;
-
-
+std::map<std::string, std::pair<service_collector_maker_t*,std::string> > serviceCollectorFactory;
 servicesManager::servicesManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg) : active(false), server(p_server), cfg(p_cfg) {}
 void servicesManager::init() {
 	Json::Value*		servCfg	  = cfg->getPlugins();
@@ -53,7 +52,7 @@ void servicesManager::init() {
 				continue;
 
 			if (file_name.substr(file_name.rfind(".")) == ".json") {
-				services.push_back(std::make_shared<service>(full_file_name));
+				services.push_back(std::make_shared<service>(server, full_file_name));
 			}
 		}
 		closedir(dir);
@@ -95,8 +94,6 @@ void servicesManager::init() {
 	for(std::map<std::string, enhancer_maker_t* >::iterator factit = enhancerFactory.begin();factit != enhancerFactory.end(); factit++)
 		enhancers.push_back(factit->second(shared_from_this()));
 
-	detectors.push_back(std::make_shared<socketDetector>(shared_from_this(), server));
-
 	// Load the lua plugins
 	const std::string dirlua = (*servCfg)["services_lua"].asString();
 	dir = opendir(dirlua.c_str());
@@ -115,21 +112,46 @@ void servicesManager::init() {
 				continue;
 
 			if (file_name.substr(file_name.rfind(".")) == ".lua") {
-				/* TODO: do something with the found file
-				collectors[name] = std::make_shared<LuaCollector>(server, cfg->getCollector(name), full_file_name);
-				*/
+				std::shared_ptr<LuaSorter> q = std::make_shared<LuaSorter>(full_file_name);
+				if (q->isType("collector")) {
+					serviceCollectorFactory[name] = std::make_pair(
+						[](std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string p_fname) -> std::shared_ptr<Collector> {
+							return std::make_shared<LuaCollector>(p_srv, p_cfg, p_fname, p_s);
+						}, full_file_name);
+				}
+				if (q->isType("enhancer")) {
+					enhancers.push_back(std::make_shared<LuaServiceEnhancer>(shared_from_this(), full_file_name));
+				}
+				if (q->isType("handler")) {
+					// TODO: store the information so it could be reused later
+				}
+				if (q->isType("detector")) {
+					// TODO: Write that LuaDetector class
+					// detectors.push_back(std::make_shared<LuaDetector>(shared_from_this(), server, full_file_name));
+				}
 			}
 		}
 		closedir(dir);
 	} else	std::cerr << "Warning: " << dirlua << " doesnt exist. No lua services plugins will be used\n";
 
+	detectors.push_back(std::make_shared<socketDetector>(shared_from_this(), server));
 
 	systemCollectors	= std::make_shared<CollectorsManager>(server,cfg);
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	associate(server,"GET","^/$",doGetRootPage);
 	associate(server,"GET","^/service/(.*)/status$",doGetServiceStatus);
 	associate(server,"GET","^/service/(.*)/html$",doGetServiceHtml);
+	associate(server,"GET","^.service/(.*)/(.*)/(.*)/history$",doGetCollectorHistory);
+	associate(server,"GET","^/service/(.*)/(.*)/(.*)/history.since=([0-9.]*)$",doGetCollectorHistory);
+	associate(server,"GET","^/service/(.*)/(.*)/(.*)/graph$",doGetCollectorGraph);
 	associate(server,"GET","^/api/swagger.json$",doGetJson);
+}
+
+servicesManager::~servicesManager() {
+	if (active) {
+		active=false;
+		my_thread.join();
+	}
 }
 
 void servicesManager::startThreads() {
@@ -242,23 +264,76 @@ void	servicesManager::doGetServiceHtml(response_ptr response, request_ptr reques
 		if ( *(*i) == id) {
 			ss << server->getHead("Service", (*i)->getID());
 			(*i)->getJsonStatus( &res );
-			ss << "<div class=\"row\"><div class=\"col-md-8\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Process</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>name</th><th>path</th><th>cwd</th><th>username</th><th>PID</th><th>status</th></tr></thead><tbody>\n";
+			ss << "<div class=\"row\"><div class=\"col-md-4\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Properties</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><tr><th>name</th><td>"+res["properties"]["name"].asString()+"</td></tr><tr><th>type</th><td>"+res["properties"]["type"].asString()+"</td></tr><tr><th>subType</th><td>"+res["properties"]["subType"].asString()+"</td></tr><tr><th>Identifier</th><td>"+res["properties"]["uniqName"].asString()+"</td></tr><tr><th>hostname</th><td>"+res["properties"]["host"].asString()+"</td></tr></table></div></div></div><div class=\"col-md-8\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Process</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>name</th><th>path</th><th>cwd</th><th>username</th><th>PID</th><th>status</th></tr></thead><tbody>\n";
 			for (Json::Value::iterator j = res["process"].begin();j!=res["process"].end();j++) {
 				std::string color = "green";
 				if ((*j)["status"].asString() != "ok") 
 					color = "red";
 				ss << "<tr><td>"+(*j)["name"].asString()+"</td><td>"+(*j)["full_path"].asString()+"</td><td>"+(*j)["cwd"].asString()+"</td><td>"+(*j)["username"].asString()+"</td><td>"+(*j)["pid"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
 			}
-			ss << "</tbody></table></div></div></div>\n<div class=\"col-md-4\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Sockets</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>listen</th><th>status</th></tr></thead><tbody>\n";
+			ss << "</tbody></table></div></div><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Sockets</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>listen</th><th>status</th></tr></thead><tbody>\n";
 			for (Json::Value::iterator j = res["sockets"].begin();j!=res["sockets"].end();j++) {
 				std::string color = "green";
 				if ((*j)["status"].asString() != "ok") 
 					color = "red";
 				ss << "<tr><td>"+(*j)["name"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
 			}
-			ss << "</tbody></table></div></div></div></div>\n";
+			ss << "</tbody></table></div></div></div></div>\n<div class=\"row\">";
+			(*i)->getCollectorsHtml(ss);
+			ss << "</div>\n";
 			ss << server->getFoot("");
 			setResponseHtml(response, ss.str());
+			return;
+		}
+	}
+	// returning an error
+	setResponse404(response, "No service matching '" + id + "' found");
+}
+
+void	servicesManager::doGetCollectorHistory(response_ptr response, request_ptr request) {
+	std::stringstream ss;
+	std::string id   = (*request)[0];
+	std::string cid   = (*request)[1];
+	Json::Value res(Json::objectValue);
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
+		if ( *(*i) == id) {
+			// TODO look for the collector and get its response here
+			std::shared_ptr<Collector> c = (*i)->getCollector(cid);
+			if (c == nullptr) {
+				res["error"] = "No collector matching '"+cid+"' for service '"+id+"' found";
+				ss << res;
+				setResponseJson(response, ss.str());
+				return;
+			}
+			request->erase(request->begin());
+			request->erase(request->begin());
+			c->doGetHistory(response,request);
+			return;
+		}
+	}
+	// returning an error
+	res["error"] = "No service matching '"+id+"' found";
+	ss << res;
+	setResponseJson(response, ss.str());
+}
+
+void	servicesManager::doGetCollectorGraph(response_ptr response, request_ptr request) {
+	std::stringstream ss;
+	std::string id   = (*request)[0];
+	std::string cid   = (*request)[1];
+	Json::Value res(Json::objectValue);
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
+		if ( *(*i) == id) {
+			std::shared_ptr<Collector> c = (*i)->getCollector(cid);
+			if (c == nullptr) {
+				res["error"] = "No collector matching '"+cid+"' for service '"+id+"' found";
+				ss << res;
+				setResponseJson(response, ss.str());
+				return;
+			}
+			request->erase(request->begin());
+			request->erase(request->begin());
+			c->doGetGraph(response,request);
 			return;
 		}
 	}
@@ -394,7 +469,7 @@ void socketDetector::find(void) {
 		for(std::vector< std::shared_ptr<socket> >::iterator it = sockets.begin(); it != sockets.end(); ++it) {
 			if (!p->haveSocket((*it)->getID())) continue;
 			// socket found, create the service
-			std::shared_ptr<service> serv = std::make_shared<service>();
+			std::shared_ptr<service> serv = std::make_shared<service>(server);
 			serv->setSocket(*it);
 			serv->addMainProcess(p);
 			// trying to associate more sockets to this service
