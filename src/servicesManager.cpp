@@ -32,8 +32,8 @@ void servicesManager::init() {
 	Json::Value*		servCfg	  = cfg->getPlugins();
 	DIR *			dir;
 	std::string		directory = (*cfg->getServices())["config_dir"].asString();
-	class dirent*		ent;
-	class stat 		st;
+	struct dirent*		ent;
+	struct stat 		st;
 	void*			dlib;
 
 	// Load the services configuration

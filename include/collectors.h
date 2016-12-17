@@ -1,9 +1,9 @@
 #pragma once
-
 #include <json/json.h>
 #include <map>
 #include <string>
 #include <thread>
+#include <mutex>
 #include "server_http.hpp"
 #include "server_https.hpp"
 
@@ -106,6 +106,7 @@ private:
 	bool				active;
 	std::thread			my_thread;
 	std::shared_ptr<HttpServer>	server;
+	std::mutex			lock;
 };
 
 
@@ -120,7 +121,7 @@ extern std::map<std::string, collector_maker_t* > collectorFactory;
 #define associate(s,type,regex,method)				\
 server->setRegex(type,regex,[this](response_ptr response, request_ptr request) { this->method(response, request); });
 #define MAKE_PLUGIN_COLLECTOR(className,id)			\
-extern "C" {							\
+extern "C" {									\
 std::shared_ptr<Collector> maker_##id(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg){	\
    return std::make_shared<className>(p_srv, p_cfg);				\
 }								\

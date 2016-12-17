@@ -40,6 +40,6 @@ end
 
 function enhance(serv)
 	-- adding this collector to every service
-	io.write(string.format("Adding cpu collector to a service\n"))
+	--io.write(string.format("Adding cpu collector to a service\n"))
 	serv.addCollector("cpu")
 end

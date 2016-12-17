@@ -38,7 +38,7 @@ std::string  Ressource::getHistory(double since) {
 	std::stringstream ss;
 	bool splitted = true;
 	ss << "[\n";
-	if (v.size()>=1) for(int i=v.size();i>=0;i--) {
+	if (v.size()>=1) for(int i=v.size()-1;i>=0;i--) {
 		if (v[i].isMember("timestamp") && v[i]["timestamp"].asDouble() >= since) {
 			if (!splitted) {
 				ss << ",\n";
@@ -115,9 +115,13 @@ void Collector::startThread() {
 	if (!active && (*cfg)["enable"].asBool()) {
 		active=true;
 		my_thread = std::thread ([this]() {
+			std::unique_lock<std::mutex> locker(lock, std::defer_lock);
 			int sec = ((*cfg)["poll-frequency"]).asInt();
 			while(active) {
+				// jsoncpp isnt thread safe
+				locker.lock();
 				collect();
+				locker.unlock();
 				std::this_thread::sleep_for(std::chrono::seconds(sec));
 			}
 		});
@@ -209,7 +213,7 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
 	std::stringstream stream;
         stream << server->getHead(desc[id], sub);
 	stream << "<div class=\"row\"><div class=\"col-md-12\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Graphics</h3><div class=\"box-tools pull-right\"><button type=\"button\" class=\"btn btn-box-tool\" onclick=\"toggle();\"><i class=\"fa fa-square-o\" id=\"btn-refresh\"></i>refresh</button></div><div class=\"box-body\"><div class=\"chart\"><div id=\"" << name.c_str() << "-graph\"></div>\n</div></div></div></div></div>\n";
-        stream << server->getFoot("var timerId = 0;var enable = false;var timerLen = "+((*cfg)["history"].asString())+";\nfunction start() { timerId = setInterval(function() { updateLiveGraph("+name+"Graph); }, timerLen); }\nfunction stop() { clearInterval(timerId); }\nfunction toggle() { if (enable) { stop();enable=false; $('#btn-refresh').removeClass('fa-check-square-o'); $('#btn-refresh').addClass('fa-square-o'); }else{ start();enable=true; $('#btn-refresh').removeClass('fa-square-o'); $('#btn-refresh').addClass('fa-check-square-o'); } }\nfunction updateLiveGraph("+name+"Graph) {\n  $.getJSON('"+basePath+name+"/"+id.c_str()+"/history', function(results) { "+name+"Graph.setData(results); });\n}\n"+name+"Graph = new Morris."+morrisType+"({element: '"+name+"-graph',  data: [], xkey: 'timestamp', hideHover: true,pointSize:0,fillOpacity:0.3,"+morrisOpts+ressources[id]->getMorrisDesc()+"});\nupdateLiveGraph("+name+"Graph);");
+        stream << server->getFoot("var timerId = 0;var enable = false;var timerLen = "+((*cfg)["poll-frequency"].asString())+"*1000;\nfunction start() { timerId = setInterval(function() { updateLiveGraph("+name+"Graph); }, timerLen); }\nfunction stop() { clearInterval(timerId); }\nfunction toggle() { if (enable) { stop();enable=false; $('#btn-refresh').removeClass('fa-check-square-o'); $('#btn-refresh').addClass('fa-square-o'); }else{ start();enable=true; $('#btn-refresh').removeClass('fa-square-o'); $('#btn-refresh').addClass('fa-check-square-o'); } }\nfunction updateLiveGraph("+name+"Graph) {\n  $.getJSON('"+basePath+name+"/"+id.c_str()+"/history', function(results) { "+name+"Graph.setData(results); });\n}\n"+name+"Graph = new Morris."+morrisType+"({element: '"+name+"-graph',  data: [], xkey: 'timestamp', hideHover: true,pointSize:0,fillOpacity:0.3,"+morrisOpts+ressources[id]->getMorrisDesc()+"});\nupdateLiveGraph("+name+"Graph);");
         setResponseHtml(response, stream.str());
 }
 
@@ -229,7 +233,10 @@ void Collector::doGetHistory(response_ptr response, request_ptr request) {
 		setResponse404(response, "No such Metric");
 		return;
 	}
+	// jsoncpp isnt thread safe
+	std::unique_lock<std::mutex> locker(lock);
 	setResponseJson(response, ressources[name]->getHistory(since));
+	locker.unlock();
 }
 
 void Collector::getIndexHtml(std::stringstream& stream ){
@@ -327,8 +334,8 @@ CollectorsManager::CollectorsManager(std::shared_ptr<HttpServer> p_server, std::
 	std::map<std::string, collector_maker_t *, std::less<std::string> >::iterator factit;
 	DIR *dir;
 	const std::string directory = (*servCfg)["collectors_cpp"].asString();
-	class dirent *ent;
-	class stat st;
+	struct dirent *ent;
+	struct stat st;
 	void *dlib;
 
 	dir = opendir(directory.c_str());

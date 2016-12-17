@@ -109,6 +109,8 @@ process::process(uint32_t p_pid): pid(p_pid),username("") {
 	if(count>0) {
 		buf[count] = '\0';
 		full_path = buf;
+		if (full_path.substr(full_path.size()-9)  == "(deleted)") // working around the file updated marking
+			full_path = full_path.substr(0, full_path.size()-10);
 		base_name = full_path.substr(full_path.rfind("/")+1);
 	}
 }
