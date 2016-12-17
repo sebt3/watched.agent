@@ -99,11 +99,13 @@ Collector::Collector(std::string p_name, std::shared_ptr<HttpServer> p_server, J
 }
 
 Collector::~Collector() {
+	std::unique_lock<std::mutex> locker(lock);
 	if (active) {
 		active=false;
-		std::unique_lock<std::mutex> locker(lock);
-		my_thread.join();
+		timer.kill();
 	}
+	active=false;
+	if (my_thread.joinable()) my_thread.join();
 }
 
 void Collector::setService(std::shared_ptr<service> p_serv) {
@@ -121,9 +123,10 @@ void Collector::startThread() {
 				// jsoncpp isnt thread safe
 				{
 					std::unique_lock<std::mutex> locker(lock);
-					collect();
+					if (active) // if we've been locked by the destructor...
+						collect();
 				}
-				std::this_thread::sleep_for(std::chrono::seconds(sec));
+				timer.wait_for(std::chrono::seconds(sec));
 			}
 		});
 	}

@@ -123,6 +123,7 @@ private:
 	std::shared_ptr<CollectorsManager>		systemCollectors;
 	std::thread 					my_thread;
 	bool						active;
+	timer_killer					timer;
 	std::shared_ptr<HttpServer> 			server;
 	std::shared_ptr<Config> 			cfg;
 };

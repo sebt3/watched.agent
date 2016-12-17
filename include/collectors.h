@@ -3,7 +3,9 @@
 #include <map>
 #include <string>
 #include <thread>
+#include <condition_variable>
 #include <mutex>
+#include <future>
 #include "server_http.hpp"
 #include "server_https.hpp"
 
@@ -74,6 +76,23 @@ private:
  * Collector
  */
 class service;
+struct timer_killer {
+	template<class R, class P>
+	bool wait_for( std::chrono::duration<R,P> const& time ) {
+		std::unique_lock<std::mutex> lock(m);
+		return !cv.wait_for(lock, time, [&]{return terminate;});
+	}
+	void kill() {
+		std::unique_lock<std::mutex> lock(m);
+		terminate=true;
+		cv.notify_all();
+	}
+	std::mutex m;
+private:
+	std::condition_variable cv;
+	bool terminate = false;
+};
+
 class Collector {
 public:
 	Collector(std::string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history = 300, uint p_freq_pool = 5, std::shared_ptr<service> p_serv = nullptr);
@@ -105,6 +124,7 @@ protected:
 	bool				haveService;
 private:
 	bool				active;
+	timer_killer			timer;
 	std::thread			my_thread;
 	std::shared_ptr<HttpServer>	server;
 	std::mutex			lock;

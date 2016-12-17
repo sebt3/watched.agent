@@ -150,6 +150,7 @@ void servicesManager::init() {
 servicesManager::~servicesManager() {
 	if (active) {
 		active=false;
+		timer.kill();
 		my_thread.join();
 	}
 }
@@ -162,8 +163,7 @@ void servicesManager::startThreads() {
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		do {
 			find();
-			std::this_thread::sleep_for(std::chrono::seconds((*servCfg)["find_frequency"].asInt()));
-		} while (active);
+		} while (active && timer.wait_for(std::chrono::seconds((*servCfg)["find_frequency"].asInt())) && active);
 		
 	});
 
@@ -458,6 +458,7 @@ void socketDetector::find(void) {
 	struct dirent *ent;
 	//std::vector< std::shared_ptr<process> > processes;
 	std::string file;
+
 	if ((dir = opendir ("/proc/")) == NULL) return;
 	while ((ent = readdir (dir)) != NULL) {
 		file = ent->d_name;
