@@ -9,11 +9,11 @@ cfg["history"]  = 300
 
 
 function declare ()
-	this.addRessource("shed", "Service scheduler information", "serviceCPU")
+	this.addRessource("shed", "Service scheduler information", "service_cpu_shed")
 	this.addProperty( "shed", "exec_runtime",  "exec_runtime", "number")
 	this.addProperty( "shed", "process",  "Number of process", "number")
 	this.addProperty( "shed", "thread",  "total number of threads", "number")
-	this.addRessource("stat", "Service CPU usage information", "serviceCPU")
+	this.addRessource("stat", "Service CPU usage information", "service_cpu_stat")
 	this.addProperty( "stat", "user",    "user %",   "number")
 	this.addProperty( "stat", "system",  "system %", "number")
 	this.addProperty( "stat", "pct",  "total % used", "number")

@@ -131,13 +131,6 @@ private:
 
 
 
-/*TODO: 
- * Ajouter le support du blackout
- * faire un collecteur basé sur /proc/[PID]/status ou /proc/[PID]/stat + /proc/[PID]/statm
- * faire un collecteur basé sur /proc/[PID]/sched ou +/proc/<pid>/schedstat+
- * faire un collecteur basé sur /proc/[PID]/io
- */
-
 /*********************************
  * ServiceHandler
  */
