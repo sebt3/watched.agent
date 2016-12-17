@@ -78,6 +78,7 @@ class Collector {
 public:
 	Collector(std::string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history = 300, uint p_freq_pool = 5, std::shared_ptr<service> p_serv = nullptr);
 	~Collector();
+	Collector(const Collector& that) = delete;
 	void startThread();
 	
 	virtual void collect() =0;

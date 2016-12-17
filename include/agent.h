@@ -51,6 +51,7 @@ private:
 class LuaCollector : public Collector {
 public:
 	LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, const std::string p_fname, std::shared_ptr<service> p_serv = nullptr);
+	~LuaCollector();
 
 	void collect();
 	void addRes(std::string p_name, std::string p_desc, std::string p_typeName);
@@ -61,7 +62,9 @@ public:
 	void getPIDList();
 	std::string getName(){ return name; }
 private:
-	sel::State state{true};
+	sel::State	state{true};
+	bool		have_state;
+	std::mutex	lua;
 };
 
 /*********************************
@@ -82,9 +85,12 @@ private:
 class LuaServiceEnhancer: public serviceEnhancer {
 public:
 	LuaServiceEnhancer(std::shared_ptr<servicesManager> p_sm, const std::string p_fname);
+	~LuaServiceEnhancer();
 	std::shared_ptr<service> enhance(std::shared_ptr<service> p_serv);
 private:
 	sel::State state{true};
+	bool		have_state;
+	std::mutex	lua;
 };
 
 

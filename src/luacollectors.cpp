@@ -3,7 +3,8 @@
 using namespace sel;
 namespace watcheD {
 
-LuaCollector::LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, const std::string p_fname, std::shared_ptr<service> p_serv): Collector("lua", p_srv, p_cfg, 0, 0, p_serv) {
+LuaCollector::LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, const std::string p_fname, std::shared_ptr<service> p_serv): Collector("lua", p_srv, p_cfg, 0, 0, p_serv), have_state(true) {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
 	state.Load(p_fname);
 	if(! cfg->isMember("history")) (*cfg)["history"] = (int)state["cfg"]["history"];
 	if(! cfg->isMember("poll-frequency")) (*cfg)["poll-frequency"] = (int)state["cfg"]["poolfreq"];
@@ -32,6 +33,11 @@ LuaCollector::LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg
 	addGetMetricRoute();
 }
 
+LuaCollector::~LuaCollector() {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	have_state = false;
+}
+
 void LuaCollector::addRes(std::string p_name, std::string p_desc, std::string p_typeName)
 { addRessource(p_name, p_desc, p_typeName); }
 void LuaCollector::addProp(std::string p_res, std::string p_name, std::string p_desc, std::string p_type)	{ ressources[p_res]->addProperty(p_name, p_desc, p_type); }
@@ -57,7 +63,9 @@ void LuaCollector::getPIDList() {
 }
 
 void LuaCollector::collect() {
-	state["collect"]();
+	std::unique_lock<std::mutex> locker(lua);  // Lua isnt exactly thread safe
+	if (have_state) 
+		state["collect"]();
 }
 
 
@@ -86,11 +94,20 @@ bool LuaSorter::isType(const std::string p_typename) {
 /*********************************
  * LuaServiceEnhancer
  */
-LuaServiceEnhancer::LuaServiceEnhancer(std::shared_ptr<servicesManager> p_sm, const std::string p_fname): serviceEnhancer(p_sm) {
+LuaServiceEnhancer::LuaServiceEnhancer(std::shared_ptr<servicesManager> p_sm, const std::string p_fname): serviceEnhancer(p_sm), have_state(true) {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
 	state.Load(p_fname);
 }
 
+LuaServiceEnhancer::~LuaServiceEnhancer() {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	have_state = false;
+}
+
 std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_serv) {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	if (!have_state) 
+		return nullptr;
 	state["p_serv"].SetObj(*p_serv,
 		"addCollector",	&service::addCollector,
 		"havePID",	&service::havePID,

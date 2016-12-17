@@ -101,6 +101,7 @@ Collector::Collector(std::string p_name, std::shared_ptr<HttpServer> p_server, J
 Collector::~Collector() {
 	if (active) {
 		active=false;
+		std::unique_lock<std::mutex> locker(lock);
 		my_thread.join();
 	}
 }
@@ -115,13 +116,13 @@ void Collector::startThread() {
 	if (!active && (*cfg)["enable"].asBool()) {
 		active=true;
 		my_thread = std::thread ([this]() {
-			std::unique_lock<std::mutex> locker(lock, std::defer_lock);
 			int sec = ((*cfg)["poll-frequency"]).asInt();
 			while(active) {
 				// jsoncpp isnt thread safe
-				locker.lock();
-				collect();
-				locker.unlock();
+				{
+					std::unique_lock<std::mutex> locker(lock);
+					collect();
+				}
 				std::this_thread::sleep_for(std::chrono::seconds(sec));
 			}
 		});
@@ -236,7 +237,6 @@ void Collector::doGetHistory(response_ptr response, request_ptr request) {
 	// jsoncpp isnt thread safe
 	std::unique_lock<std::mutex> locker(lock);
 	setResponseJson(response, ressources[name]->getHistory(since));
-	locker.unlock();
 }
 
 void Collector::getIndexHtml(std::stringstream& stream ){
