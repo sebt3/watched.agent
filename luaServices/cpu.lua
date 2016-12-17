@@ -4,8 +4,8 @@ table.insert(types, "enhancer")
 
 cfg = {}
 cfg["name"] = "cpu"
-cfg["poolfreq"] = 5
-cfg["history"]  = 300
+cfg["poolfreq"] = 10
+cfg["history"]  = 150
 
 
 function declare ()
@@ -51,6 +51,7 @@ function collect ()
 			cpu_count=cpu_count+1
 		end
 	end
+	f:close()
 	if (cpu_count==0) then
 		cpu_count=1
 	end
@@ -73,6 +74,7 @@ function collect ()
 				thread = thread + tonumber(line:match(".*: (%d+)"))
 			end
 		end
+		f:close()
 		f = assert(io.open("/proc/".. pids[i] .."/stat", "r"))
 		local t = f:read("*all")
 		local n = 3
@@ -100,6 +102,7 @@ function collect ()
 			end
 			n=n+1
 		end
+		f:close()
 		i=i+1
 		process=process+1
 	end

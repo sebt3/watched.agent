@@ -4,8 +4,8 @@ table.insert(types, "enhancer")
 
 cfg = {}
 cfg["name"] = "mem"
-cfg["poolfreq"] = 5
-cfg["history"]  = 300
+cfg["poolfreq"] = 60
+cfg["history"]  = 100
 
 
 function declare ()
@@ -40,6 +40,7 @@ function collect ()
 				shared = shared + tonumber(val)
 			end
 		end
+		f:close()
 		i=i+1
 	end
 	this.setDProperty("mem", "swap",   swap)

@@ -4,8 +4,8 @@ table.insert(types, "enhancer")
 
 cfg = {}
 cfg["name"] = "io"
-cfg["poolfreq"] = 5
-cfg["history"]  = 300
+cfg["poolfreq"] = 10
+cfg["history"]  = 150
 
 
 function declare ()
@@ -44,6 +44,7 @@ function collect ()
 				writes[pids[i] .. ""] = tonumber(val)
 			end
 		end
+		f:close()
 		i=i+1
 	end
 	if found then
