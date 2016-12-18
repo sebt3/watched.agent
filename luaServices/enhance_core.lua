@@ -31,6 +31,7 @@ function enhance(serv)
 	end
 	if name == "rpc.statd" then
 		serv.setUniqKey("dynamic")
+		serv.updateBasePaths()
 		-- as its base port is not fixed, its id would change from boot to boot
 		-- which is not desirable. So hard coding one here
 	end

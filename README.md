@@ -31,17 +31,16 @@ Complete instructions [here](https://sebt3.github.io/watched/doc/install/#the-ag
 ## Current features
 - Very lightweight
 - Forward the collected data to the backend over a REST service
-- Collect system metric based on C++ or lua plugins 
+- C++ and lua plugins framework for services management and system metrics
 - Detect network services and monitor them
-- (untested) C++ plugin framework for services management
+- Service performance data (with initial plugins : CPU, memory, IO)
+- Service classification
 - Can be secured using SSL (tls1.2)
 - Offer a web micro frontend (might be used to monitor a single host)
 
 ## Planned
-- Service performance data (with initial plugins : CPU, memory, IO and cgroup)
+- Lua plugins support for services detection, handler
 - Service log monitoring
-- Service classification
-- Lua plugins support for services detection, enhencement
 - Plugins for :
   * systemd services detection, enhencement and log monitoring
   * docker services detection, enhencement

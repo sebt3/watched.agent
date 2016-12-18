@@ -119,6 +119,7 @@ std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_
 		"setSubType",	&service::setSubType,
 		"setUniqKey",	&service::setUniqKey,
 		"setHost",	&service::setHost,
+		"updateBasePaths", &service::updateBasePaths,
 		"setName",	&service::setName
 	);
 

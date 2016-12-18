@@ -245,6 +245,7 @@ service::service(const service& p_src) {
 	for(std::map< std::string, std::shared_ptr<Collector> >::const_iterator i=p_src.collectors.begin();i!=p_src.collectors.end();i++)
 		if (collectors.find(i->first) == collectors.end())
 			collectors[i->first] = i->second;
+	updateBasePaths();
 	setDefaultHost();
 }
 
@@ -255,6 +256,11 @@ void	service::addCollector(const std::string p_name) {
 		return; // no factory matching this name
 	collectors[p_name] = serviceCollectorFactory[p_name].first(server, getCollectorCfg(p_name), shared_from_this(), serviceCollectorFactory[p_name].second);
 	collectors[p_name]->startThread();
+}
+
+void	service::updateBasePaths() {
+	for(std::map< std::string, std::shared_ptr<Collector> >::iterator i=collectors.begin();i!=collectors.end();i++)
+		i->second->setService(shared_from_this());
 }
 
 std::shared_ptr<Collector>	service::getCollector(std::string p_name) {

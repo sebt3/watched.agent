@@ -26,21 +26,23 @@ function collect ()
 	this.getPIDList()
 	while (type(pids[i]) == "number")
 	do
-		f = assert(io.open("/proc/".. pids[i] .."/smaps", "r"))
-		for line in f:lines() do
-			key = line:match("(%a+)")
-			if (key == "Rss") then
-				val = line:match("(%d+)")
-				total = total + tonumber(val)
-			elseif (key == "Swap") then
-				val = line:match("(%d+)")
-				swap = swap + tonumber(val)
-			elseif (key == "Shared_Clean") then
-				val = line:match("(%d+)")
-				shared = shared + tonumber(val)
+		f = io.open("/proc/".. pids[i] .."/smaps", "r")
+		if f~=nil then
+			for line in f:lines() do
+				key = line:match("(%a+)")
+				if (key == "Rss") then
+					val = line:match("(%d+)")
+					total = total + tonumber(val)
+				elseif (key == "Swap") then
+					val = line:match("(%d+)")
+					swap = swap + tonumber(val)
+				elseif (key == "Shared_Clean") then
+					val = line:match("(%d+)")
+					shared = shared + tonumber(val)
+				end
 			end
+			f:close()
 		end
-		f:close()
 		i=i+1
 	end
 	this.setDProperty("mem", "swap",   swap)

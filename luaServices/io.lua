@@ -26,25 +26,27 @@ function collect ()
 	this.getPIDList()
 	while (type(pids[i]) == "number")
 	do
-		f = assert(io.open("/proc/".. pids[i] .."/io", "r"))
-		for line in f:lines() do
-			if (line:match("(%a+_%a+)") == "read_bytes") then
-				val = line:match("(%d+)")
-				if(type(reads[pids[i] .. ""]) == "number") then
-					res_reads = res_reads + tonumber(val) - reads[pids[i] .. ""]
-					found = true
+		f = io.open("/proc/".. pids[i] .."/io", "r")
+		if f ~= nill then
+			for line in f:lines() do
+				if (line:match("(%a+_%a+)") == "read_bytes") then
+					val = line:match("(%d+)")
+					if(type(reads[pids[i] .. ""]) == "number") then
+						res_reads = res_reads + tonumber(val) - reads[pids[i] .. ""]
+						found = true
+					end
+					reads[pids[i] .. ""] = tonumber(val)
+				elseif (line:match("(%a+_%a+)") == "write_bytes") then
+					val = line:match("(%d+)")
+					if(type(writes[pids[i] .. ""]) == "number") then
+						res_writes = res_writes + tonumber(val) - writes[pids[i] .. ""]
+						found = true
+					end
+					writes[pids[i] .. ""] = tonumber(val)
 				end
-				reads[pids[i] .. ""] = tonumber(val)
-			elseif (line:match("(%a+_%a+)") == "write_bytes") then
-				val = line:match("(%d+)")
-				if(type(writes[pids[i] .. ""]) == "number") then
-					res_writes = res_writes + tonumber(val) - writes[pids[i] .. ""]
-					found = true
-				end
-				writes[pids[i] .. ""] = tonumber(val)
 			end
+			f:close()
 		end
-		f:close()
 		i=i+1
 	end
 	if found then

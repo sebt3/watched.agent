@@ -30,6 +30,7 @@ prev_total_time = 0
 
 function collect ()
 	local f
+	local t
 	local i          = 1
 	local sum        = 0.0
 	local process    = 0
@@ -55,28 +56,31 @@ function collect ()
 	if (cpu_count==0) then
 		cpu_count=1
 	end
-	if prev_total_time ~= 0 then
-		this.nextValue("shed")
-		this.nextValue("stat")
-	end
 	this.getPIDList()
 	while (type(pids[i]) == "number")
 	do
-		f = assert(io.open("/proc/".. pids[i] .."/sched", "r"))
-		for line in f:lines() do
-			if (line:match("(%a+.%a+_%a+_%a+)") == "se.sum_exec_runtime") then
-				val = line:match("(%d+.%d+)")
-				if(type(values[pids[i] .. ""]) == "number") then
-					sum = sum + tonumber(val) - values[pids[i] .. ""]
+		f = io.open("/proc/".. pids[i] .."/sched", "r")
+		if f ~= nill then
+			for line in f:lines() do
+				if (line:match("(%a+.%a+_%a+_%a+)") == "se.sum_exec_runtime") then
+					val = line:match("(%d+.%d+)")
+					if(type(values[pids[i] .. ""]) == "number") then
+						sum = sum + tonumber(val) - values[pids[i] .. ""]
+					end
+					values[pids[i] .. ""] = tonumber(val)
+				elseif (line:match("threads") == "threads") then
+					thread = thread + tonumber(line:match(".*: (%d+)"))
 				end
-				values[pids[i] .. ""] = tonumber(val)
-			elseif (line:match("threads") == "threads") then
-				thread = thread + tonumber(line:match(".*: (%d+)"))
 			end
+			f:close()
 		end
-		f:close()
-		f = assert(io.open("/proc/".. pids[i] .."/stat", "r"))
-		local t = f:read("*all")
+		f = io.open("/proc/".. pids[i] .."/stat", "r")
+		if f~=nil then
+			t = f:read("*all")
+			f:close()
+		else
+			t = ""
+		end
 		local n = 3
 		for part in string.gmatch(t, "%d+") do
 			if n == 14 then
@@ -102,14 +106,15 @@ function collect ()
 			end
 			n=n+1
 		end
-		f:close()
 		i=i+1
 		process=process+1
 	end
 	if prev_total_time ~= 0 then
+		this.nextValue("shed")
 		this.setDProperty("shed", "exec_runtime", sum)
 		this.setDProperty("shed", "process", process)
 		this.setDProperty("shed", "thread", thread)
+		this.nextValue("stat")
 		this.setDProperty("stat", "user",    res_users*100*cpu_count/(total_time-prev_total_time))
 		this.setDProperty("stat", "system",  res_sys*100*cpu_count/(total_time-prev_total_time))
 		this.setDProperty("stat", "pct",  (res_sys+res_users)*100*cpu_count/(total_time-prev_total_time))
@@ -121,6 +126,5 @@ end
 
 function enhance(serv)
 	-- adding this collector to every service
-	--io.write(string.format("Adding cpu collector to a service\n"))
 	serv.addCollector("cpu")
 end

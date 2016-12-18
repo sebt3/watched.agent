@@ -100,6 +100,7 @@ public:
 	void		setHost(std::string p_host) { host=p_host; }
 	void		setName(std::string p_name) { name=p_name; }
 	void		setUniqKey(std::string p_key) { uniqName=p_key; }
+	void		updateBasePaths();
 
 	void		saveConfigTemplate(std::string p_cfg_dir);
 	void		getIndexHtml(std::stringstream& stream );
