@@ -3,6 +3,7 @@
 #include <chrono>
 using namespace watcheD;
 
+#include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 #include <openssl/sha.h>
 #include <iostream>
@@ -16,6 +17,20 @@ const std::string APPS_NAME="watched.agent";
 const std::string APPS_DESC="Watch over wasted being washed up";
 #include "config.h"
 
+
+/*void error_report(std::shared_ptr<SimpleWeb::ServerBase<socket_type>::Request> req, const boost::system::error_code& ec)  {
+	std::string err = ec.message();
+	if (ec.category() == boost::asio::error::get_ssl_category()) {
+		err = std::string(" (")
+			+boost::lexical_cast<std::string>(ERR_GET_LIB(ec.value()))+","
+			+boost::lexical_cast<std::string>(ERR_GET_FUNC(ec.value()))+","
+			+boost::lexical_cast<std::string>(ERR_GET_REASON(ec.value()))+") ";
+		char buf[128];
+		::ERR_error_string_n(ec.value(), buf, sizeof(buf));
+		err += buf;
+	}
+	std::cerr << "Some error on accept: " << err << std::endl;
+}*/
 std::string sha256(const std::string p_fname) {
 	std::string ret = "";
 	unsigned char hash[SHA256_DIGEST_LENGTH];
@@ -90,8 +105,22 @@ HttpServer::HttpServer(Json::Value* p_cfg) : cfg(p_cfg) {
 					(stat (sslkey.c_str(), &buffer) == 0) );
 
 	if (useSSL) {
-		https = std::make_shared<SWHttpsServer>(port_i, 1, sslcert, sslkey, 5, 300, sslvrf, true);
+		https = std::make_shared<SWHttpsServer>(port_i, 1, sslcert, sslkey, 5, 300, sslvrf);
 		https->config.address  = (*cfg)["host"].asString();
+		https->on_error = [](request_ptr_s req, const boost::system::error_code& ec)  {
+			std::string err = ec.message();
+			if (ec.category() == boost::asio::error::get_ssl_category()) {
+				err = std::string(" (")
+					+boost::lexical_cast<std::string>(ERR_GET_LIB(ec.value()))+","
+					+boost::lexical_cast<std::string>(ERR_GET_FUNC(ec.value()))+","
+					+boost::lexical_cast<std::string>(ERR_GET_REASON(ec.value()))+") ";
+				char buf[128];
+				::ERR_error_string_n(ec.value(), buf, sizeof(buf));
+				err += buf;
+			}
+			std::cerr << "Some error on accept: " << err << std::endl;
+		};
+
 		https->default_resource["GET"]=[this](std::shared_ptr<SWHttpsServer::Response> response, std::shared_ptr<SWHttpsServer::Request> request) {
 			try {
 				auto web_root_path=boost::filesystem::canonical((*cfg)["web_root"].asString());
@@ -141,6 +170,11 @@ HttpServer::HttpServer(Json::Value* p_cfg) : cfg(p_cfg) {
 	} else {
 		http = std::make_shared<SWHttpServer>(port_i, 1);
 		http->config.address  = (*cfg)["host"].asString();
+		http->on_error = [](request_ptr_h req, const boost::system::error_code& ec)  {
+			std::string err = ec.message();
+			std::cerr << "Some error on accept: " << err << std::endl;
+		};
+
 		http->default_resource["GET"]=[this](std::shared_ptr<SWHttpServer::Response> response, std::shared_ptr<SWHttpServer::Request> request) {
 			try {
 				auto web_root_path=boost::filesystem::canonical((*cfg)["web_root"].asString());

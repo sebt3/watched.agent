@@ -147,6 +147,9 @@ void Collector::addGetMetricRoute() {
 
 void Collector::getDefinitions(Json::Value* p_defs) {
 	Json::Value data(Json::objectValue);
+	if (haveService) {
+		data["x-isService"] = true;
+	}
 	if ((*cfg)["enable"].asBool()) {
 		for(std::map<std::string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
 			if (! p_defs->isMember(i->second->typeName))

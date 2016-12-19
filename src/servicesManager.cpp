@@ -395,11 +395,13 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 	res["definitions"]["serviceProcess"]["properties"]["username"]["type"]	= "string";
 	res["definitions"]["serviceProcess"]["requiered"][0]			= "name";
 	res["definitions"]["serviceProcess"]["requiered"][1]			= "status";
-	res["definitions"]["serviceSocket"]["type"]				= "object";
+	res["definitions"]["serviceProcess"]["requiered"][1]			= "status";
+	res["definitions"]["serviceProcess"]["x-isService"]			= false;
 	res["definitions"]["serviceSocket"]["properties"]["name"]["type"]	= "string";
 	res["definitions"]["serviceSocket"]["properties"]["status"]["type"]	= "string";
 	res["definitions"]["serviceSocket"]["requiered"][0]			= "name";
 	res["definitions"]["serviceSocket"]["requiered"][1]			= "status";
+	res["definitions"]["serviceSocket"]["x-isService"]			= false;
 	res["definitions"]["services"]["properties"]["host"]["type"]		= "string";
 	res["definitions"]["services"]["properties"]["process"]["type"]		= "array";
 	res["definitions"]["services"]["properties"]["process"]["items"]["type"]= "#/definitions/serviceProcess";
@@ -408,6 +410,7 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 	res["definitions"]["services"]["requiered"][0]				= "sockets";
 	res["definitions"]["services"]["requiered"][1]				= "process";
 	res["definitions"]["services"]["requiered"][2]				= "host";
+	res["definitions"]["services"]["x-isService"]				= false;
 	res["paths"]["/service/all/status"]["get"]["responses"]["200"]["description"] = "All services status";
 	res["paths"]["/service/all/status"]["get"]["responses"]["200"]["schema"]["type"] = "object";
 	res["paths"]["/service/all/status"]["get"]["responses"]["200"]["schema"]["additionalProperties"]["$ref"] = "#/definitions/services";

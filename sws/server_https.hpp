@@ -3,31 +3,42 @@
 
 #include "server_http.hpp"
 #include <boost/asio/ssl.hpp>
-#include <boost/lexical_cast.hpp>
 #include <openssl/ssl.h>
-
+#include <algorithm>
 
 namespace SimpleWeb {
     typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> HTTPS;    
-    static const unsigned char ssl_session_ctx_id = 1;
-
+    
     template<>
     class Server<HTTPS> : public ServerBase<HTTPS> {
+        std::string session_id_context;
+        bool set_session_id_context=false;
     public:
         Server(unsigned short port, size_t num_threads, const std::string& cert_file, const std::string& private_key_file,
                 long timeout_request=5, long timeout_content=300,
-                const std::string& verify_file=std::string(), bool verify_certificate=false) : 
+                const std::string& verify_file=std::string()) : 
                 ServerBase<HTTPS>::ServerBase(port, num_threads, timeout_request, timeout_content), 
                 context(boost::asio::ssl::context::tlsv12) { // 2016/08/13 only use tls12, see https://www.ssllabs.com/ssltest
             context.use_certificate_chain_file(cert_file);
             context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
             
-            if(verify_file.size()>0)
+            if(verify_file.size()>0) {
                 context.load_verify_file(verify_file);
-            if(verify_certificate) {
-		SSL_CTX_set_session_id_context(context.native_handle(), &ssl_session_ctx_id, sizeof(ssl_session_ctx_id));
-                context.set_verify_mode(boost::asio::ssl::verify_peer|boost::asio::ssl::verify_fail_if_no_peer_cert);
-	    }
+                context.set_verify_mode(boost::asio::ssl::verify_peer | boost::asio::ssl::verify_fail_if_no_peer_cert |
+                                        boost::asio::ssl::verify_client_once);
+                set_session_id_context=true;
+            }
+        }
+        
+        void start() {
+            if(set_session_id_context) {
+                // Creating session_id_context from address:port but reversed due to small SSL_MAX_SSL_SESSION_ID_LENGTH
+                session_id_context=std::to_string(config.port)+':';
+                session_id_context.append(config.address.rbegin(), config.address.rend());
+                SSL_CTX_set_session_id_context(context.native_handle(), reinterpret_cast<const unsigned char*>(session_id_context.data()),
+                                               std::min<size_t>(session_id_context.size(), SSL_MAX_SSL_SESSION_ID_LENGTH));
+            }
+            ServerBase::start();
         }
 
     protected:
@@ -50,27 +61,18 @@ namespace SimpleWeb {
                     
                     //Set timeout on the following boost::asio::ssl::stream::async_handshake
                     auto timer=get_timeout_timer(socket, timeout_request);
-                    (*socket).async_handshake(boost::asio::ssl::stream_base::server, [this, socket, timer]
+                    socket->async_handshake(boost::asio::ssl::stream_base::server, [this, socket, timer]
                             (const boost::system::error_code& ec) {
                         if(timer)
                             timer->cancel();
                         if(!ec)
                             read_request_and_content(socket);
-			else {
-				std::string err = ec.message();
-				if (ec.category() == boost::asio::error::get_ssl_category()) {
-					err = std::string(" (")
-						+boost::lexical_cast<std::string>(ERR_GET_LIB(ec.value()))+","
-						+boost::lexical_cast<std::string>(ERR_GET_FUNC(ec.value()))+","
-						+boost::lexical_cast<std::string>(ERR_GET_REASON(ec.value()))+") ";
-					char buf[128];
-					::ERR_error_string_n(ec.value(), buf, sizeof(buf));
-					err += buf;
-					std::cerr << "Some error on accept: " << err << std::endl;
-				}
-			}
+                        else if(on_error)
+                            on_error(std::shared_ptr<Request>(new Request(*socket)), ec);
                     });
                 }
+                else if(on_error)
+                    on_error(std::shared_ptr<Request>(new Request(*socket)), ec);
             });
         }
     };

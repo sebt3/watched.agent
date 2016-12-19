@@ -22,6 +22,9 @@
 
 namespace SimpleWeb {
     template <class socket_type>
+    class Server;
+    
+    template <class socket_type>
     class ServerBase {
     public:
         virtual ~ServerBase() {}
@@ -59,6 +62,7 @@ namespace SimpleWeb {
         
         class Request {
             friend class ServerBase<socket_type>;
+            friend class Server<socket_type>;
             
             //Based on http://www.boost.org/doc/libs/1_60_0/doc/html/unordered/hash_equality.html
             class iequal_to {
@@ -89,7 +93,13 @@ namespace SimpleWeb {
             unsigned short remote_endpoint_port;
             
         private:
-            Request(): content(streambuf) {}
+            Request(const socket_type &socket): content(streambuf) {
+                try {
+                    remote_endpoint_address=socket.lowest_layer().remote_endpoint().address().to_string();
+                    remote_endpoint_port=socket.lowest_layer().remote_endpoint().port();
+                }
+                catch(...) {}
+            }
             
             boost::asio::streambuf streambuf;
         };
@@ -116,14 +126,14 @@ namespace SimpleWeb {
         std::unordered_map<std::string, 
             std::function<void(std::shared_ptr<typename ServerBase<socket_type>::Response>, std::shared_ptr<typename ServerBase<socket_type>::Request>)> > default_resource;
         
-        std::function<void(const std::exception&)> exception_handler;
+        std::function<void(std::shared_ptr<typename ServerBase<socket_type>::Request>, const boost::system::error_code&)> on_error;
 
     private:
         std::vector<std::pair<std::string, std::vector<std::pair<REGEX_NS::regex,
             std::function<void(std::shared_ptr<typename ServerBase<socket_type>::Response>, std::shared_ptr<typename ServerBase<socket_type>::Request>)> > > > > opt_resource;
         
     public:
-        void start() {
+        virtual void start() {
             //Copy the resources to opt_resource for more efficient request processing
             opt_resource.clear();
             for(auto& res: resource) {
@@ -231,18 +241,10 @@ namespace SimpleWeb {
         void read_request_and_content(const std::shared_ptr<socket_type> &socket) {
             //Create new streambuf (Request::streambuf) for async_read_until()
             //shared_ptr is used to pass temporary objects to the asynchronous functions
-            std::shared_ptr<Request> request(new Request());
-            try {
-                request->remote_endpoint_address=socket->lowest_layer().remote_endpoint().address().to_string();
-                request->remote_endpoint_port=socket->lowest_layer().remote_endpoint().port();
-            }
-            catch(const std::exception &e) {
-                if(exception_handler)
-                   exception_handler(e);
-            }
+            std::shared_ptr<Request> request(new Request(*socket));
 
             //Set timeout on the following boost::asio::async-read or write function
-            auto timer=get_timeout_timer(socket, timeout_request);
+            auto timer=this->get_timeout_timer(socket, timeout_request);
                         
             boost::asio::async_read_until(*socket, request->streambuf, "\r\n\r\n",
                     [this, socket, request, timer](const boost::system::error_code& ec, size_t bytes_transferred) {
@@ -255,7 +257,7 @@ namespace SimpleWeb {
                     //streambuf (maybe some bytes of the content) is appended to in the async_read-function below (for retrieving content).
                     size_t num_additional_bytes=request->streambuf.size()-bytes_transferred;
                     
-                    if(!parse_request(request))
+                    if(!this->parse_request(request))
                         return;
                     
                     //If content, read that as well
@@ -266,13 +268,13 @@ namespace SimpleWeb {
                             content_length=stoull(it->second);
                         }
                         catch(const std::exception &e) {
-                            if(exception_handler)
-                                exception_handler(e);
+                            if(on_error)
+                                on_error(request, boost::system::error_code(boost::system::errc::protocol_error, boost::system::generic_category()));
                             return;
                         }
                         if(content_length>num_additional_bytes) {
                             //Set timeout on the following boost::asio::async-read or write function
-                            auto timer=get_timeout_timer(socket, timeout_content);
+                            auto timer=this->get_timeout_timer(socket, timeout_content);
                             boost::asio::async_read(*socket, request->streambuf,
                                     boost::asio::transfer_exactly(content_length-num_additional_bytes),
                                     [this, socket, request, timer]
@@ -280,15 +282,19 @@ namespace SimpleWeb {
                                 if(timer)
                                     timer->cancel();
                                 if(!ec)
-                                    find_resource(socket, request);
+                                    this->find_resource(socket, request);
+                                else if(on_error)
+                                    on_error(request, ec);
                             });
                         }
                         else
-                            find_resource(socket, request);
+                            this->find_resource(socket, request);
                     }
                     else
-                        find_resource(socket, request);
+                        this->find_resource(socket, request);
                 }
+                else if(on_error)
+                    on_error(request, ec);
             });
         }
 
@@ -304,7 +310,7 @@ namespace SimpleWeb {
 
                     size_t protocol_end;
                     if((protocol_end=line.find('/', path_end+1))!=std::string::npos) {
-                        if(line.substr(path_end+1, protocol_end-path_end-1)!="HTTP")
+                        if(line.compare(path_end+1, protocol_end-path_end-1, "HTTP")!=0)
                             return false;
                         request->http_version=line.substr(protocol_end+1, line.size()-protocol_end-2);
                     }
@@ -357,11 +363,11 @@ namespace SimpleWeb {
                 std::function<void(std::shared_ptr<typename ServerBase<socket_type>::Response>,
                                    std::shared_ptr<typename ServerBase<socket_type>::Request>)>& resource_function) {
             //Set timeout on the following boost::asio::async-read or write function
-            auto timer=get_timeout_timer(socket, timeout_content);
+            auto timer=this->get_timeout_timer(socket, timeout_content);
 
             auto response=std::shared_ptr<Response>(new Response(socket), [this, request, timer](Response *response_ptr) {
                 auto response=std::shared_ptr<Response>(response_ptr);
-                send(response, [this, response, request, timer](const boost::system::error_code& ec) {
+                this->send(response, [this, response, request, timer](const boost::system::error_code& ec) {
                     if(timer)
                         timer->cancel();
                     if(!ec) {
@@ -370,8 +376,8 @@ namespace SimpleWeb {
                             http_version=stof(request->http_version);
                         }
                         catch(const std::exception &e){
-                            if(exception_handler)
-                                exception_handler(e);
+                            if(on_error)
+                                on_error(request, boost::system::error_code(boost::system::errc::protocol_error, boost::system::generic_category()));
                             return;
                         }
                         
@@ -381,8 +387,10 @@ namespace SimpleWeb {
                                 return;
                         }
                         if(http_version>1.05)
-                            read_request_and_content(response->socket);
+                            this->read_request_and_content(response->socket);
                     }
+                    else if(on_error)
+                        on_error(request, ec);
                 });
             });
 
@@ -390,8 +398,8 @@ namespace SimpleWeb {
                 resource_function(response, request);
             }
             catch(const std::exception &e) {
-                if(exception_handler)
-                    exception_handler(e);
+                if(on_error)
+                    on_error(request, boost::system::error_code(boost::system::errc::operation_canceled, boost::system::generic_category()));
                 return;
             }
         }
@@ -423,8 +431,10 @@ namespace SimpleWeb {
                     boost::asio::ip::tcp::no_delay option(true);
                     socket->set_option(option);
                     
-                    read_request_and_content(socket);
+                    this->read_request_and_content(socket);
                 }
+                else if(on_error)
+                    on_error(std::shared_ptr<Request>(new Request(*socket)), ec);
             });
         }
     };
