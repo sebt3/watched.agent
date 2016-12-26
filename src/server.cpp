@@ -104,7 +104,7 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 				::ERR_error_string_n(ec.value(), buf, sizeof(buf));
 				err += buf;
 			}
-			logNotice("Problem while handling an HTTPS request: "+err);
+			logNotice("HttpServer::httpsOnError", err);
 		};
 
 		https->default_resource["GET"]=[this](std::shared_ptr<SWHttpsServer::Response> response, std::shared_ptr<SWHttpsServer::Request> request) {
@@ -158,7 +158,7 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 		http->config.address  = (*cfg)["host"].asString();
 		http->on_error = [this](request_ptr_h req, const boost::system::error_code& ec)  {
 			std::string err = ec.message();
-			logNotice("Problem while handling an HTTP request: "+err);
+			logNotice("HttpServer::httpOnError", err);
 		};
 
 		http->default_resource["GET"]=[this](std::shared_ptr<SWHttpServer::Response> response, std::shared_ptr<SWHttpServer::Request> request) {
@@ -258,11 +258,11 @@ void HttpServer::start() {
 		http->start();
 }
 
-void HttpServer::logError(std::string p_message) { l->error(p_message); }
-void HttpServer::logWarning(std::string p_message) { l->warning(p_message); }
-void HttpServer::logInfo(std::string p_message) { l->info(p_message); }
-void HttpServer::logNotice(std::string p_message) { l->notice(p_message); }
-void HttpServer::logDebug(std::string p_message) { l->debug(p_message); }
+void HttpServer::logError(  const std::string p_src, std::string p_message) { l->error(  p_src, p_message); }
+void HttpServer::logWarning(const std::string p_src, std::string p_message) { l->warning(p_src, p_message); }
+void HttpServer::logInfo(   const std::string p_src, std::string p_message) { l->info(   p_src, p_message); }
+void HttpServer::logNotice( const std::string p_src, std::string p_message) { l->notice( p_src, p_message); }
+void HttpServer::logDebug(  const std::string p_src, std::string p_message) { l->debug(  p_src, p_message); }
 
 
 std::string HttpServer::getHead(std::string p_title, std::string p_sub) {

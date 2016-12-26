@@ -27,11 +27,11 @@ public:
 	void start();
 	std::string getHead(std::string p_title, std::string p_sub="");
 	std::string getFoot(std::string p_script);
-	void logError(std::string p_message);
-	void logWarning(std::string p_message);
-	void logInfo(std::string p_message);
-	void logNotice(std::string p_message);
-	void logDebug(std::string p_message);
+	void logError(  const std::string p_src, std::string p_message);
+	void logWarning(const std::string p_src, std::string p_message);
+	void logInfo(   const std::string p_src, std::string p_message);
+	void logNotice( const std::string p_src, std::string p_message);
+	void logDebug(  const std::string p_src, std::string p_message);
 private:
 	std::shared_ptr<SWHttpServer>   http;
 	std::shared_ptr<SWHttpsServer>  https;

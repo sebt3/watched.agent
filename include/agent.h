@@ -33,13 +33,13 @@ private:
 class log {
 public:
 	log(Json::Value* p_cfg);
-	void write(uint16_t p_lvl, std::string p_message);
-	void write(std::string p_lvl, std::string p_message);
-	void error(std::string p_message);
-	void warning(std::string p_message);
-	void info(std::string p_message);
-	void notice(std::string p_message);
-	void debug(std::string p_message);
+	void write(uint16_t p_lvl, const std::string p_src, std::string p_message);
+	void write(std::string p_lvl, const std::string p_src, std::string p_message);
+	void error(const std::string p_src, std::string p_message);
+	void warning(const std::string p_src, std::string p_message);
+	void info(const std::string p_src, std::string p_message);
+	void notice(const std::string p_src, std::string p_message);
+	void debug(const std::string p_src, std::string p_message);
 private:
 	Json::Value*	cfg;
 	uint16_t	level;

@@ -56,7 +56,7 @@ void servicesManager::init() {
 			}
 		}
 		closedir(dir);
-	}  else	server->logWarning(directory+" doesnt exist. No services configuration will be loaded");
+	}  else	server->logWarning("servicesManager::", directory+" doesnt exist. No services configuration will be loaded");
 
 	// Load the services plugins
 	directory = (*servCfg)["services_cpp"].asString();
@@ -78,13 +78,13 @@ void servicesManager::init() {
 			if (file_name.substr(file_name.rfind(".")) == ".so") {
 				dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
 				if(dlib == NULL){
-					server->logError(std::string(dlerror())+" while loading "+full_file_name); 
+					server->logError("servicesManager::", std::string(dlerror())+" while loading "+full_file_name); 
 					exit(-1);
 				}
 			}
 		}
 		closedir(dir);
-	} else	server->logWarning(directory+" doesnt exist. No services plugins will be used");
+	} else	server->logWarning("servicesManager::", directory+" doesnt exist. No services plugins will be used");
 
 	// Instanciate the detector classes
 	for(std::map<std::string, detector_maker_t* >::iterator factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
@@ -132,7 +132,7 @@ void servicesManager::init() {
 			}
 		}
 		closedir(dir);
-	} else	server->logWarning(dirlua+" doesnt exist. No lua services plugins will be used");
+	} else	server->logWarning("servicesManager::", dirlua+" doesnt exist. No lua services plugins will be used");
 
 	detectors.push_back(std::make_shared<socketDetector>(shared_from_this(), server));
 
@@ -145,6 +145,7 @@ void servicesManager::init() {
 	associate(server,"GET","^/service/(.*)/(.*)/(.*)/history.since=([0-9.]*)$",doGetCollectorHistory);
 	associate(server,"GET","^/service/(.*)/(.*)/(.*)/graph$",doGetCollectorGraph);
 	associate(server,"GET","^/api/swagger.json$",doGetJson);
+	server->logInfo("servicesManager::", "watched.agent started and ready.");
 }
 
 servicesManager::~servicesManager() {
@@ -488,7 +489,7 @@ void socketDetector::find(void) {
 		}
 	}
 	closedir (dir);
-	server->logNotice("socketDetector found "+std::to_string(count)+" services");
+	server->logNotice("socketDetector::find", "found "+std::to_string(count)+" services");
 	// TODO: do something with the non-matching sockets too
 }
 
