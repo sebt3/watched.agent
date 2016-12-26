@@ -123,8 +123,10 @@ void Collector::startThread() {
 				// jsoncpp isnt thread safe
 				{
 					std::unique_lock<std::mutex> locker(lock);
-					if (active) // if we've been locked by the destructor...
+					if (active) {// if we've been locked by the destructor...
 						collect();
+						server->logNotice("Collector "+basePath+name+" updated");
+					}
 				}
 				timer.wait_for(std::chrono::seconds(sec));
 			}
@@ -361,14 +363,14 @@ CollectorsManager::CollectorsManager(std::shared_ptr<HttpServer> p_server, std::
 
 			if (file_name.substr(file_name.rfind(".")) == ".so") {
 				dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
-				if(dlib == NULL){
-					std::cerr << dlerror() << std::endl; 
+				if(dlib == NULL) {
+					server->logError(std::string(dlerror())+" while loading "+full_file_name); 
 					exit(-1);
 				}
 			}
 		}
 		closedir(dir);
-	} else	std::cerr << "Warning: " << directory << " doesnt exist. No collectors plugins will be used\n";
+	} else	server->logWarning(directory+" doesnt exist. No collectors plugins will be used\n");
 
 	// Instanciate the plugins classes
 	for(factit = collectorFactory.begin();factit != collectorFactory.end(); factit++) {
@@ -398,7 +400,7 @@ CollectorsManager::CollectorsManager(std::shared_ptr<HttpServer> p_server, std::
 			}
 		}
 		closedir(dir);
-	} else	std::cerr << "Warning: " << dirlua << " doesnt exist. No lua collectors will be used\n";
+	} else	server->logWarning( dirlua +" doesnt exist. No lua collectors will be used\n");
 }
 
 void CollectorsManager::startThreads() {

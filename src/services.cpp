@@ -296,7 +296,7 @@ void	service::setDefaultHost() {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_CANONNAME;
 	if ((gai_result = getaddrinfo(ghost, "http", &hints, &info)) != 0) {
-		std::cerr << "getaddrinfo: " << gai_strerror(gai_result) << std::endl;
+		server->logError("service::setDefaultHost: getaddrinfo: "+std::string(gai_strerror(gai_result)));
 		return;
 	}
 	/*for(p = info; p != NULL; p = p->ai_next) {
@@ -342,7 +342,7 @@ void	service::saveConfigTemplate(std::string p_cfg_dir){
 	std::string fname = p_cfg_dir+std::string("/")+name+"-"+uniqName+std::string(".json.template");
 	std::ofstream cfgof (fname, std::ifstream::out);
 	if (!cfgof) {
-		std::cerr << "Warning: Cannot write on " << fname << ". Service configuration template NOT updated\n";
+		server->logWarning("Cannot write on "+fname+". Service configuration template NOT updated");
 		return;
 	}
 	cfgof<<cfg;

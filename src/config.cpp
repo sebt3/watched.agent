@@ -110,4 +110,13 @@ Json::Value* 	Config::getAgent() {
 	return &(data["agent"]); 
 }
 
+Json::Value* 	Config::getLog() { 
+	Json::Value obj_value(Json::objectValue);
+	if(! data.isMember("log")) {
+		data["log"] = obj_value;
+		data["log"].setComment(std::string("/*\tThe agent log configuration */"), Json::commentBefore);
+	}
+	return &(data["log"]); 
+}
+
 }

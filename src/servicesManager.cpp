@@ -56,7 +56,7 @@ void servicesManager::init() {
 			}
 		}
 		closedir(dir);
-	}  else	std::cerr << "Warning: " << directory << " doesnt exist. No services configuration will be loaded\n";
+	}  else	server->logWarning(directory+" doesnt exist. No services configuration will be loaded");
 
 	// Load the services plugins
 	directory = (*servCfg)["services_cpp"].asString();
@@ -78,13 +78,13 @@ void servicesManager::init() {
 			if (file_name.substr(file_name.rfind(".")) == ".so") {
 				dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
 				if(dlib == NULL){
-					std::cerr << dlerror() << std::endl; 
+					server->logError(std::string(dlerror())+" while loading "+full_file_name); 
 					exit(-1);
 				}
 			}
 		}
 		closedir(dir);
-	} else	std::cerr << "Warning: " << directory << " doesnt exist. No services plugins will be used\n";
+	} else	server->logWarning(directory+" doesnt exist. No services plugins will be used");
 
 	// Instanciate the detector classes
 	for(std::map<std::string, detector_maker_t* >::iterator factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
@@ -113,7 +113,7 @@ void servicesManager::init() {
 
 			if (file_name.substr(file_name.rfind(".")) == ".lua") {
 				std::shared_ptr<LuaSorter> q = std::make_shared<LuaSorter>(full_file_name);
-				if (q->isType("collector")) {
+				if (q->isType("collector") && (serviceCollectorFactory.find(name) == serviceCollectorFactory.end())) {
 					serviceCollectorFactory[name] = std::make_pair(
 						[](std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string p_fname) -> std::shared_ptr<Collector> {
 							return std::make_shared<LuaCollector>(p_srv, p_cfg, p_fname, p_s);
@@ -132,7 +132,7 @@ void servicesManager::init() {
 			}
 		}
 		closedir(dir);
-	} else	std::cerr << "Warning: " << dirlua << " doesnt exist. No lua services plugins will be used\n";
+	} else	server->logWarning(dirlua+" doesnt exist. No lua services plugins will be used");
 
 	detectors.push_back(std::make_shared<socketDetector>(shared_from_this(), server));
 
@@ -429,6 +429,7 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
  */
 void socketDetector::find(void) {
 	std::shared_ptr<servicesManager> mgr = services.lock();
+	uint16_t count = 0;
 	if (!mgr) return;
 	std::map<std::string,std::string> files;
 	files["tcp"]  = "/proc/net/tcp";
@@ -482,10 +483,12 @@ void socketDetector::find(void) {
 				serv->setSocket(*i);
 			}
 			mgr->addService(serv);
+			count++;
 			break;
 		}
 	}
 	closedir (dir);
+	server->logNotice("socketDetector found "+std::to_string(count)+" services");
 	// TODO: do something with the non-matching sockets too
 }
 

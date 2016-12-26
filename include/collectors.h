@@ -18,20 +18,26 @@ typedef std::shared_ptr<std::vector<std::string>> request_ptr;
  */
 typedef SimpleWeb::Server<SimpleWeb::HTTP> SWHttpServer;
 typedef SimpleWeb::Server<SimpleWeb::HTTPS> SWHttpsServer;
-
+class log;
 class HttpServer {
 public:
-	HttpServer(Json::Value* p_cfg);
+	HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg);
 	void setRegex(std::string p_opt, std::string p_regex, std::function<void(response_ptr, request_ptr)> p_fnct);
 	void setDefault(std::string p_opt, std::function<void(response_ptr, request_ptr)> p_fnct);
 	void start();
 	std::string getHead(std::string p_title, std::string p_sub="");
 	std::string getFoot(std::string p_script);
+	void logError(std::string p_message);
+	void logWarning(std::string p_message);
+	void logInfo(std::string p_message);
+	void logNotice(std::string p_message);
+	void logDebug(std::string p_message);
 private:
-	std::shared_ptr<SWHttpServer>  http;
-	std::shared_ptr<SWHttpsServer> https;
-	Json::Value* cfg;
-	bool useSSL;
+	std::shared_ptr<SWHttpServer>   http;
+	std::shared_ptr<SWHttpsServer>  https;
+	std::shared_ptr<log>		l;
+	Json::Value*			cfg;
+	bool				useSSL;
 };
 /*********************************
  * Ressource

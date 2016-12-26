@@ -9,3 +9,4 @@ const std::string WATCHED_CFG_SRV="@CMAKE_INSTALL_SYSCONFDIR@/watched/services";
 const std::string WATCHED_SSL_KEY="@CMAKE_INSTALL_SYSCONFDIR@/watched/ssl/agent.key";
 const std::string WATCHED_SSL_CERT="@CMAKE_INSTALL_SYSCONFDIR@/watched/ssl/agent.pem";
 const std::string WATCHED_SSL_VRF="@CMAKE_INSTALL_SYSCONFDIR@/watched/ssl/agent.verify.pem";
+const std::string WATCHED_LOG_FILE="@CMAKE_INSTALL_LOCALSTATEDIR@/log/watched.agent.log";

@@ -3,6 +3,7 @@ table.insert(types, "enhancer")
 
 function enhance(serv)
 	lookup = lookup or { --			type		subType
+		["steam"]		= { "desktop",		"game"		},
 		["kdeconnectd"]		= { "desktop",		"kde"		},
 		["chromium"]		= { "desktop",		"browser"	},
 		["avahi-daemon"]	= { "desktop",		"apple"		},

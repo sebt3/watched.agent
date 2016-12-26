@@ -97,6 +97,14 @@ if (SYSTEMD_FOUND)
 		@ONLY)
 	install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tools/systemd/watched.agent.service"
 		DESTINATION "${SYSTEMD_SERVICES_INSTALL_DIR}")
+	if (EXISTS /etc/logrotate.d)
+		configure_file(
+			"${PROJECT_SOURCE_DIR}/tools/logrotate/watched.in"
+			"${PROJECT_BINARY_DIR}/tools/logrotate/watched.agent"
+			@ONLY)
+		install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tools/logrotate/watched.agent"
+			DESTINATION "/etc/logrotate.d")
+	endif (EXISTS /etc/logrotate.d)
 endif (SYSTEMD_FOUND)
 ####
 ## Targets

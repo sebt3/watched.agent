@@ -24,9 +24,27 @@ public:
 	Json::Value* 	getServices() { return &(data["services"]); }
 	Json::Value* 	getPlugins() { return &(data["plugins"]); }
 	Json::Value* 	getAgent();
+	Json::Value* 	getLog();
 private:
 	Json::Value	data;
 	std::string	fname;
+};
+
+class log {
+public:
+	log(Json::Value* p_cfg);
+	void write(uint16_t p_lvl, std::string p_message);
+	void write(std::string p_lvl, std::string p_message);
+	void error(std::string p_message);
+	void warning(std::string p_message);
+	void info(std::string p_message);
+	void notice(std::string p_message);
+	void debug(std::string p_message);
+private:
+	Json::Value*	cfg;
+	uint16_t	level;
+	static const std::vector<std::string> levels;
+	std::mutex	mutex;
 };
 
 /*********************************
