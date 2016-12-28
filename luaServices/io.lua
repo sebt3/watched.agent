@@ -10,8 +10,8 @@ cfg["history"]  = 150
 
 function declare ()
 	this.addRessource("io", "Service IO usage", "service_io")
-	this.addProperty( "io", "read",  "Read bytes", "number")
-	this.addProperty( "io", "write",  "Write bytes", "number")
+	this.addProperty( "io", "rd",  "Read bytes", "number")
+	this.addProperty( "io", "wt",  "Write bytes", "number")
 end
 
 reads  = {}
@@ -51,8 +51,8 @@ function collect ()
 	end
 	if found then
 		this.nextValue("io")
-		this.setDProperty("io", "read", res_reads)
-		this.setDProperty("io", "write", res_writes)
+		this.setDProperty("io", "rd", res_reads)
+		this.setDProperty("io", "wr", res_writes)
 	end
 	prev_total_time = total_time
 end
