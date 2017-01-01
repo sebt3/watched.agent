@@ -52,6 +52,7 @@ public:
 	bool 		haveSocket(uint32_t p_socket_id);
 	bool 		getStatus();
 	uint32_t	getPID() { return pid; }
+	uint32_t	getPPID();
 	std::string	getPath() { return full_path; }
 	std::string	getName() { return base_name; }
 	std::string	getCWD();
@@ -94,6 +95,7 @@ public:
 
 	void		setSocket(std::shared_ptr<socket> p_sock);
 	void 		addMainProcess(std::shared_ptr<process> p_p);
+	void 		addSubProcess(std::shared_ptr<process> p_p);
 	void		setHandler(std::shared_ptr<serviceHandler> p_h) { handler = p_h; }
 	void		setType(std::string p_type) { type=p_type; }
 	void		setSubType(std::string p_type) { subType=p_type; }
@@ -126,7 +128,7 @@ private:
 	std::vector< std::shared_ptr<socket> >		sockets;
 	std::vector< std::shared_ptr<process> >		mainProcess;
 	std::map< std::string, std::shared_ptr<Collector> >	collectors;
-	//std::vector< std::shared_ptr<process> >	subProcess;
+	std::vector< std::shared_ptr<process> >		subProcess;
 	std::shared_ptr<HttpServer>			server;
 };
 

@@ -109,7 +109,7 @@ process::process(uint32_t p_pid): pid(p_pid),username("") {
 	if(count>0) {
 		buf[count] = '\0';
 		full_path = buf;
-		if (full_path.substr(full_path.size()-9)  == "(deleted)") // working around the file updated marking
+		if (full_path.size()>9 && full_path.substr(full_path.size()-9)  == "(deleted)") // working around the file updated marking
 			full_path = full_path.substr(0, full_path.size()-10);
 		base_name = full_path.substr(full_path.rfind("/")+1);
 	}
@@ -117,6 +117,20 @@ process::process(uint32_t p_pid): pid(p_pid),username("") {
 
 process::process(std::string p_fullpath):pid(0),username(""), full_path(p_fullpath) {
 	base_name = full_path.substr(full_path.rfind("/")+1);
+}
+
+uint32_t process::getPPID() {
+	std::string	line;
+	std::ifstream	infile("/proc/"+std::to_string(pid)+"/stat");
+	while(infile.good() && getline(infile, line)) {
+		std::istringstream iss(line);
+		std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
+		infile.close();
+		return atoi(tokens[3].c_str());
+	}
+	if (infile.good())
+		infile.close();
+	return 0;
 }
 
 void process::setSockets() {
@@ -242,6 +256,8 @@ service::service(const service& p_src) {
 		sockets.push_back(*i);
 	for(std::vector< std::shared_ptr<process> >::const_iterator i=p_src.mainProcess.begin();i!=p_src.mainProcess.end();i++)
 		mainProcess.push_back(*i);
+	for(std::vector< std::shared_ptr<process> >::const_iterator i=p_src.subProcess.begin();i!=p_src.subProcess.end();i++)
+		subProcess.push_back(*i);
 	for(std::map< std::string, std::shared_ptr<Collector> >::const_iterator i=p_src.collectors.begin();i!=p_src.collectors.end();i++)
 		if (collectors.find(i->first) == collectors.end())
 			collectors[i->first] = i->second;
@@ -280,6 +296,16 @@ std::shared_ptr< std::vector<uint32_t> >	service::getPIDs() {
 
 	for (std::vector< std::shared_ptr<process> >::iterator i = mainProcess.begin();i!=mainProcess.end();i++)
 		ret->push_back((*i)->getPID());
+
+	std::vector< std::shared_ptr<process> >::iterator i = subProcess.begin();
+	while (i!=subProcess.end()) {
+		if (! (*i)->getStatus()) {
+			i = subProcess.erase(i);
+		} else {
+			ret->push_back((*i)->getPID());
+			i++;
+		}
+	}
 
 	return ret;
 }
@@ -364,9 +390,33 @@ void	service::setSocket(std::shared_ptr<socket> p_sock) {
 void 	service::addMainProcess(std::shared_ptr<process> p_p) { 
 	if (mainProcess.size()==0 && name == "")
 		name = p_p->getName();
+	if (p_p->getPID() != 0) { // not a process from configuration file
+		// check if this is a child process
+		uint32_t ppid = p_p->getPPID();
+		for (std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++) {
+			if ((*i)->getPID() == ppid) {
+				addSubProcess(p_p);
+				return;
+			}
+		}
+		// check if this process is the father of any known process
+		std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();
+		while (i!=mainProcess.end()) {
+			if ((*i)->getPPID() == p_p->getPID()) {
+				addSubProcess(*i);
+				i = mainProcess.erase(i);
+			} else i++;
+		}
+		
+	}
 	mainProcess.push_back(p_p);
-	
-	//TODO: detect sub processes (which have ppid=p_p)
+}
+void 	service::addSubProcess(std::shared_ptr<process> p_p) {
+	for (std::vector< std::shared_ptr<process> >::iterator i=subProcess.begin();i!=subProcess.end();i++) {
+		if ((*i)->getPID() == p_p->getPID())
+			return;
+	}
+	subProcess.push_back(p_p);
 }
 
 bool	service::haveSocket(uint32_t p_socket_id) {
@@ -383,6 +433,8 @@ bool	service::haveProcessSocket(std::string p_socket_source) {
 
 bool	service::havePID(uint32_t p_pid) {
 	for (std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
+		if ((*i)->getPID() == p_pid) return true;
+	for (std::vector< std::shared_ptr<process> >::iterator i=subProcess.begin();i!=subProcess.end();i++)
 		if ((*i)->getPID() == p_pid) return true;
 	return false;
 }
@@ -411,6 +463,21 @@ void	service::getJsonStatus(Json::Value* ref) {
 			(*ref)["process"][n]["pid"]  = (*i)->getPID();
 			(*ref)["process"][n]["cwd"]   = (*i)->getCWD();
 			(*ref)["process"][n]["username"]   = (*i)->getUsername();
+		}
+	}
+	n=0;for(std::vector< std::shared_ptr<process> >::iterator i=subProcess.begin();i!=subProcess.end();i++,n++) {
+		(*ref)["subprocess"][n]["name"]   = (*i)->getName();
+		(*ref)["subprocess"][n]["full_path"]   = (*i)->getPath();
+		(*ref)["subprocess"][n]["status"] = "ok";
+		if (! (*i)->getStatus()) {
+			std::string stts = "failed";
+			if (haveHandler() && handler->isBlackout())
+				stts = "ok (blackout)";
+			(*ref)["subprocess"][n]["status"] = stts;
+		} else {
+			(*ref)["subprocess"][n]["pid"]  = (*i)->getPID();
+			(*ref)["subprocess"][n]["cwd"]   = (*i)->getCWD();
+			(*ref)["subprocess"][n]["username"]   = (*i)->getUsername();
 		}
 	}
 	(*ref)["host"] = host;
@@ -509,6 +576,7 @@ void	service::updateFrom(std::shared_ptr<service> src) {
 		setSocket((*i));
 	}
 
+	// TODO: copy the subProcess too, maybe ?
 	// TODO: copy the collectors, updating the service too
 
 	// TODO: copy the configuration, not just the collectors conf

@@ -279,6 +279,13 @@ void	servicesManager::doGetServiceHtml(response_ptr response, request_ptr reques
 					color = "red";
 				ss << "<tr><td>"+(*j)["name"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
 			}
+			ss << "</tbody></table></div></div><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">subProcess</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>name</th><th>path</th><th>cwd</th><th>username</th><th>PID</th><th>status</th></tr></thead><tbody>\n";
+			for (Json::Value::iterator j = res["subprocess"].begin();j!=res["subprocess"].end();j++) {
+				std::string color = "green";
+				if ((*j)["status"].asString() != "ok") 
+					color = "red";
+				ss << "<tr><td>"+(*j)["name"].asString()+"</td><td>"+(*j)["full_path"].asString()+"</td><td>"+(*j)["cwd"].asString()+"</td><td>"+(*j)["username"].asString()+"</td><td>"+(*j)["pid"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
+			}
 			ss << "</tbody></table></div></div></div></div>\n<div class=\"row\">";
 			(*i)->getCollectorsHtml(ss);
 			ss << "</div>\n";
