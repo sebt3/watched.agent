@@ -113,66 +113,12 @@ private:
 
 
 /*********************************
- * ServicesManager
- */
-//TODO: plugins should be able to be written in lua
-
-class servicesManager : public std::enable_shared_from_this<servicesManager> {
-public:
-	servicesManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg);
-	~servicesManager();
-	void	init();
-	void	find();
-	void	addService(std::shared_ptr<service> p_serv);
-	bool	haveSocket(uint32_t p_socket_id);
-	bool	havePID(uint32_t p_pid);
-	void	doGetJson(response_ptr response, request_ptr request);
-	void	doGetServiceStatus(response_ptr response, request_ptr request);
-	void	doGetServiceHtml(response_ptr response, request_ptr request);
-	void	doGetCollectorHistory(response_ptr response, request_ptr request);
-	void	doGetCollectorGraph(response_ptr response, request_ptr request);
-	void	doGetRootPage(response_ptr response, request_ptr request);
-	void	startThreads();
-	std::shared_ptr<service> enhanceFromFactory(std::string p_id, std::shared_ptr<service> p_serv);
-private:
-	std::vector< std::shared_ptr<service> >		services;
-	std::vector< std::shared_ptr<serviceDetector> >	detectors;
-	std::vector< std::shared_ptr<serviceEnhancer> >	enhancers;
-	std::shared_ptr<CollectorsManager>		systemCollectors;
-	std::thread 					my_thread;
-	bool						active;
-	timer_killer					timer;
-	std::shared_ptr<HttpServer> 			server;
-	std::shared_ptr<Config> 			cfg;
-};
-
-
-/*********************************
  * SocketDetector
  */
 class socketDetector: public serviceDetector {
 public:
 	socketDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server):serviceDetector(p_sm, p_server) {}
 	void find();
-};
-
-/*********************************
- * ServiceCPUCollector
- */
-class serviceCollector : public Collector {
-public:
-	serviceCollector(std::string p_name, std::shared_ptr<service> p_serv, std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector(p_name, p_srv, p_cfg), serv(p_serv) {
-		basePath = "/service/"+p_serv->getID()+"/";
-	}
-protected:
-	std::weak_ptr<service> serv;
-};
-class serviceCpuCollector : public serviceCollector {
-public:
-	serviceCpuCollector(std::shared_ptr<service> p_serv, std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : serviceCollector("serviceCPU", p_serv, p_srv, p_cfg) {	}
-	void	collect() {
-		
-	}
 };
 
 

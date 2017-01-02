@@ -80,6 +80,7 @@ file (GLOB	      HEADER_FILES "include/*.h")
 file (GLOB      AGENT_SOURCE_FILES "src/*.cpp")
 file (GLOB COLLECTORS_SOURCE_FILES "collectors/*.cpp" )
 file (GLOB   SERVICES_SOURCE_FILES "services/*.cpp" )
+file (GLOB      SDBUS_SOURCE_FILES "services/sdbus/*.cpp" )
 file (GLOB    LUA_COLLECTORS_FILES "luaCollectors/*.lua" )
 file (GLOB      LUA_SERVICES_FILES "luaServices/*.lua" )
 
@@ -90,6 +91,9 @@ configure_file ("${PROJECT_SOURCE_DIR}/tools/conf/agent.config.json.in"
                 "${PROJECT_BINARY_DIR}/agent.config.json" )
 include_directories(${PROJECT_BINARY_DIR}/include)
 
+####
+## systemd support and integration
+#
 if (SYSTEMD_FOUND)
 	configure_file(
 		"${PROJECT_SOURCE_DIR}/tools/systemd/watched.agent.service.in"
@@ -105,18 +109,23 @@ if (SYSTEMD_FOUND)
 		install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tools/logrotate/watched.agent"
 			DESTINATION "/etc/logrotate.d")
 	endif (EXISTS /etc/logrotate.d)
+	if (HAVE_SDBUS)
+		set(CMAKE_BUILD_WITH_INSTALL_RPATH "ON")
+		set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/services)
+		foreach( service_cpp ${SDBUS_SOURCE_FILES} )
+			get_filename_component( service ${service_cpp} NAME_WE )
+			add_library( ${service} SHARED ${service_cpp} )
+			target_link_libraries(${service} ${LIBSYSTEMD_LIBRARIES})
+			install(TARGETS ${service} DESTINATION lib/watched/services.cpp)
+		endforeach( service_cpp ${SDBUS_SOURCE_FILES} )
+	endif (HAVE_SDBUS)
 endif (SYSTEMD_FOUND)
 ####
 ## Targets
 #
 set( AGT_SOURCE_FILES ${AGENT_SOURCE_FILES})
-add_executable(watched.agent ${AGT_SOURCE_FILES} ${PROJECT_BINARY_DIR}/agent.config.json)
-target_link_libraries(watched.agent dl ${JSONCPP_LIBRARIES} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${LUA_LIBRARIES})
-install(TARGETS watched.agent DESTINATION sbin COMPONENT binaries)
-install(FILES ${PROJECT_BINARY_DIR}/agent.config.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched COMPONENT config)
-install(DIRECTORY DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched/services)
 
-
+# Collectors plugins
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/collectors)
 foreach( collector_cpp ${COLLECTORS_SOURCE_FILES} )
 	get_filename_component( collector ${collector_cpp} NAME_WE )
@@ -124,12 +133,20 @@ foreach( collector_cpp ${COLLECTORS_SOURCE_FILES} )
 	install(TARGETS ${collector} DESTINATION lib/watched/collectors.cpp)
 endforeach( collector_cpp ${COLLECTORS_SOURCE_FILES} )
 
+# services plugins
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/services)
 foreach( service_cpp ${SERVICES_SOURCE_FILES} )
 	get_filename_component( service ${service_cpp} NAME_WE )
 	add_library( ${service} SHARED ${service_cpp} )
 	install(TARGETS ${service} DESTINATION lib/watched/services.cpp)
 endforeach( service_cpp ${SERVICES_SOURCE_FILES} )
+
+# the agent itself
+add_executable(watched.agent ${AGT_SOURCE_FILES} ${PROJECT_BINARY_DIR}/agent.config.json)
+target_link_libraries(watched.agent dl ${JSONCPP_LIBRARIES} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${LUA_LIBRARIES})
+install(TARGETS watched.agent DESTINATION sbin COMPONENT binaries)
+install(FILES ${PROJECT_BINARY_DIR}/agent.config.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched COMPONENT config)
+install(DIRECTORY DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched/services)
 
 install(FILES "include/collectors.h" DESTINATION include/watched)
 install(FILES "include/services.h" DESTINATION include/watched)

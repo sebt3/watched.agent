@@ -439,13 +439,31 @@ bool	service::havePID(uint32_t p_pid) {
 	return false;
 }
 
+std::shared_ptr<process>	service::getProcess(uint32_t p_pid) {
+	for (std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++)
+		if ((*i)->getPID() == p_pid) return *i;
+	for (std::vector< std::shared_ptr<process> >::iterator i=subProcess.begin();i!=subProcess.end();i++)
+		if ((*i)->getPID() == p_pid) return *i;
+	return nullptr;
+}
+
 void	service::getJsonStatus(Json::Value* ref) {
+	bool isBlackout = false;
+	if (haveHandler()) {
+		bool failed = false;
+		for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end()&&!failed;i++)
+			if (! haveSocket((*i)->getID())) failed = true;
+		for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end()&&!failed;i++)
+			if (! (*i)->getStatus()) failed = true;
+		if (failed)
+			isBlackout = handler->isBlackout();
+	}
 	int n=0;for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++,n++) {
 		(*ref)["sockets"][n]["name"]   = (*i)->getSource();
 		std::string stts = "ok";
 		if (! haveSocket((*i)->getID())) {
 			stts = "failed";
-			if (haveHandler() && handler->isBlackout())
+			if (isBlackout)
 				stts = "ok (blackout)";
 		}
 		(*ref)["sockets"][n]["status"] = stts;
@@ -456,7 +474,7 @@ void	service::getJsonStatus(Json::Value* ref) {
 		(*ref)["process"][n]["status"] = "ok";
 		if (! (*i)->getStatus()) {
 			std::string stts = "failed";
-			if (haveHandler() && handler->isBlackout())
+			if (isBlackout)
 				stts = "ok (blackout)";
 			(*ref)["process"][n]["status"] = stts;
 		} else {
@@ -466,19 +484,15 @@ void	service::getJsonStatus(Json::Value* ref) {
 		}
 	}
 	n=0;for(std::vector< std::shared_ptr<process> >::iterator i=subProcess.begin();i!=subProcess.end();i++,n++) {
-		(*ref)["subprocess"][n]["name"]   = (*i)->getName();
-		(*ref)["subprocess"][n]["full_path"]   = (*i)->getPath();
-		(*ref)["subprocess"][n]["status"] = "ok";
 		if (! (*i)->getStatus()) {
-			std::string stts = "failed";
-			if (haveHandler() && handler->isBlackout())
-				stts = "ok (blackout)";
-			(*ref)["subprocess"][n]["status"] = stts;
-		} else {
-			(*ref)["subprocess"][n]["pid"]  = (*i)->getPID();
-			(*ref)["subprocess"][n]["cwd"]   = (*i)->getCWD();
-			(*ref)["subprocess"][n]["username"]   = (*i)->getUsername();
+			//TODO: remove this subProcess
+			continue;
 		}
+		(*ref)["subprocess"][n]["name"]		= (*i)->getName();
+		(*ref)["subprocess"][n]["full_path"]	= (*i)->getPath();
+		(*ref)["subprocess"][n]["pid"]		= (*i)->getPID();
+		(*ref)["subprocess"][n]["cwd"]		= (*i)->getCWD();
+		(*ref)["subprocess"][n]["username"]	= (*i)->getUsername();
 	}
 	(*ref)["host"] = host;
 	(*ref)["properties"]["host"] = host;
@@ -491,13 +505,23 @@ void	service::getJsonStatus(Json::Value* ref) {
 void	service::getIndexHtml(std::stringstream& stream ) {
 	int ok=0;
 	int failed=0;
+	bool isBlackout = false;
+	if (haveHandler()) {
+		bool failed = false;
+		for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end()&&!failed;i++)
+			if (! haveSocket((*i)->getID())) failed = true;
+		for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end()&&!failed;i++)
+			if (! (*i)->getStatus()) failed = true;
+		if (failed)
+			isBlackout = handler->isBlackout();
+	}
 	for(std::vector< std::shared_ptr<socket> >::iterator i=sockets.begin();i!=sockets.end();i++) {
-		if ((! haveSocket((*i)->getID())) && !(haveHandler() && handler->isBlackout()))
+		if ((! haveSocket((*i)->getID())) && !(isBlackout))
 			failed++;
 		else	ok++;
 	}
 	for(std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();i!=mainProcess.end();i++) {
-		if ( (! (*i)->getStatus()) && !(haveHandler() && handler->isBlackout()))
+		if ( (! (*i)->getStatus()) && !(isBlackout))
 			failed++;
 		else	ok++;
 	}
@@ -550,6 +574,17 @@ bool	service::operator==(const service& rhs) {
 
 bool	service::operator==(const std::string rhs) {
 	return (rhs == name+"-"+uniqName );
+}
+
+void	service::updateMainProcess(std::shared_ptr<process> p_p) {
+	for(std::vector< std::shared_ptr<process> >::iterator j=mainProcess.begin();j!=mainProcess.end();j++) {
+		if (! (*j)->getStatus() && (*j)->getPath() == p_p->getPath()) {
+			j = mainProcess.erase(j);
+			break;
+		}
+	}
+
+	addMainProcess(p_p);
 }
 
 void	service::updateFrom(std::shared_ptr<service> src) {

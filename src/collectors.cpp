@@ -366,7 +366,7 @@ CollectorsManager::CollectorsManager(std::shared_ptr<HttpServer> p_server, std::
 				dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
 				if(dlib == NULL) {
 					server->logError("CollectorsManager::", std::string(dlerror())+" while loading "+full_file_name); 
-					exit(-1);
+					//exit(-1);
 				}
 			}
 		}

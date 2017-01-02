@@ -95,6 +95,7 @@ public:
 
 	void		setSocket(std::shared_ptr<socket> p_sock);
 	void 		addMainProcess(std::shared_ptr<process> p_p);
+	void		updateMainProcess(std::shared_ptr<process> p_p);
 	void 		addSubProcess(std::shared_ptr<process> p_p);
 	void		setHandler(std::shared_ptr<serviceHandler> p_h) { handler = p_h; }
 	void		setType(std::string p_type) { type=p_type; }
@@ -110,6 +111,7 @@ public:
 	void		getJson(Json::Value* p_defs);
 	void		addCollector(const std::string p_name);
 	std::shared_ptr<Collector>	getCollector(std::string p_name);
+	std::shared_ptr<process>	getProcess(uint32_t p_pid);
 	Json::Value* 	getCollectorCfg(std::string p_name);
 	void		getCollectorsHtml(std::stringstream& stream );
 	std::shared_ptr< std::vector<uint32_t> >	getPIDs();
@@ -140,7 +142,6 @@ private:
 class serviceHandler {
 public:
 	serviceHandler(std::shared_ptr<service> p_s): serv(p_s) {}
-	virtual bool status() =0;
 	virtual bool isBlackout() =0;
 protected:
 	std::weak_ptr<service>		serv;
@@ -160,6 +161,7 @@ protected:
 	std::weak_ptr<servicesManager>	services;
 };
 
+
 /*********************************
  * Detectors
  */
@@ -171,6 +173,42 @@ public:
 protected:
 	std::shared_ptr<HttpServer>	server;
 	std::weak_ptr<servicesManager>	services;
+};
+
+/*********************************
+ * ServicesManager
+ */
+class Config;
+class CollectorsManager;
+class servicesManager : public std::enable_shared_from_this<servicesManager> {
+public:
+	servicesManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg);
+	~servicesManager();
+	void	init();
+	void	find();
+	void	addService(std::shared_ptr<service> p_serv);
+	void	handleSubProcess(std::shared_ptr<process> p_p);
+	bool	haveSocket(uint32_t p_socket_id);
+	bool	havePID(uint32_t p_pid);
+	void	doGetJson(response_ptr response, request_ptr request);
+	void	doGetServiceStatus(response_ptr response, request_ptr request);
+	void	doGetServiceHtml(response_ptr response, request_ptr request);
+	void	doGetCollectorHistory(response_ptr response, request_ptr request);
+	void	doGetCollectorGraph(response_ptr response, request_ptr request);
+	void	doGetRootPage(response_ptr response, request_ptr request);
+	void	startThreads();
+	std::shared_ptr<service> getService(uint32_t p_pid);
+	std::shared_ptr<service> enhanceFromFactory(std::string p_id, std::shared_ptr<service> p_serv);
+private:
+	std::vector< std::shared_ptr<service> >		services;
+	std::vector< std::shared_ptr<serviceDetector> >	detectors;
+	std::vector< std::shared_ptr<serviceEnhancer> >	enhancers;
+	std::shared_ptr<CollectorsManager>		systemCollectors;
+	std::thread 					my_thread;
+	bool						active;
+	timer_killer					timer;
+	std::shared_ptr<HttpServer> 			server;
+	std::shared_ptr<Config> 			cfg;
 };
 
 /*********************************

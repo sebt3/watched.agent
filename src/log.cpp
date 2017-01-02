@@ -40,7 +40,7 @@ void log::write(uint16_t p_lvl, const std::string p_src, std::string p_message) 
 	char buffer[80];
 	time (&rawtime);
 	timeinfo = localtime(&rawtime);
-	strftime(buffer,80,"%d-%m-%Y %I:%M:%S",timeinfo);
+	strftime(buffer,80,"%d-%m-%Y %H:%M:%S",timeinfo);
 
 	std::ofstream outfile;
 	std::unique_lock<std::mutex> locker(mutex); 

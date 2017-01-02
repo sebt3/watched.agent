@@ -79,7 +79,7 @@ void servicesManager::init() {
 				dlib = dlopen(full_file_name.c_str(), RTLD_NOW);
 				if(dlib == NULL){
 					server->logError("servicesManager::", std::string(dlerror())+" while loading "+full_file_name); 
-					exit(-1);
+					//exit(-1);
 				}
 			}
 		}
@@ -227,6 +227,21 @@ bool	servicesManager::havePID(uint32_t p_pid) {
 	return false;
 }
 
+std::shared_ptr<service> servicesManager::getService(uint32_t p_pid) {
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++)
+		if ((*i)->havePID(p_pid)) return *i;
+	return nullptr;
+}
+
+void	servicesManager::handleSubProcess(std::shared_ptr<process> p_p) {
+	uint32_t ppid = p_p->getPPID();
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
+		if ((*i)->havePID(ppid)) {
+			(*i)->addSubProcess(p_p);
+			return;
+		}
+	}
+}
 
 void	servicesManager::doGetServiceStatus(response_ptr response, request_ptr request) {
 	std::stringstream ss;
@@ -475,10 +490,27 @@ void socketDetector::find(void) {
 	while ((ent = readdir (dir)) != NULL) {
 		file = ent->d_name;
 		if (!std::all_of(file.begin(), file.end(), ::isdigit)) continue;
-		if (mgr->havePID(atoi(file.c_str())))
-			continue; // process already associated to a service
-		std::shared_ptr<process> p = std::make_shared<process>(atoi(file.c_str()));
+		uint32_t pid = atoi(file.c_str());
+		if (mgr->havePID(pid)) {
+			// process already associated to a service, updating the known socket list
+			std::shared_ptr<service> serv = mgr->getService(pid);
+			if(!serv) continue;
+			std::shared_ptr<process> p = serv->getProcess(pid);
+			if(!p) continue;
+			p->setSockets();
+			for(std::vector< std::shared_ptr<socket> >::iterator i = sockets.begin(); i != sockets.end();i++) {
+				if (!serv->haveSocket((*i)->getID())) continue;
+				serv->setSocket(*i);
+			}
+			continue;
+		}
+		std::shared_ptr<process> p = std::make_shared<process>(pid);
+		if (mgr->havePID(p->getPPID())) {
+			mgr->handleSubProcess(p);
+			continue;
+		}
 		p->setSockets();
+
 		for(std::vector< std::shared_ptr<socket> >::iterator it = sockets.begin(); it != sockets.end(); ++it) {
 			if (!p->haveSocket((*it)->getID())) continue;
 			// socket found, create the service
