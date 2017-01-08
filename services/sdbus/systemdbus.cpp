@@ -1,7 +1,8 @@
 #include "services.h"
-#include <systemd/sd-bus.h>
 using namespace watcheD;
 
+// might use this version once libsystemd actually stop leaking memory
+#include <systemd/sd-bus.h>
 static uint32_t getPID(sd_bus *bus, std::string path) {
 	const char *contents = NULL;
 	sd_bus_error error = SD_BUS_ERROR_NULL;
@@ -47,7 +48,7 @@ static uint32_t getPID(sd_bus *bus, std::string path) {
 	r = sd_bus_message_peek_type(reply, &type, &contents);
 	if (r < 0) {
 		sd_bus_message_unref(reply);
-		std::cerr << "Failed to sd_bus_message_peek_type: " << strerror(-r)  << std::endl;
+		std::cerr << "Failed to sd_bus_mesSage_peek_type: " << strerror(-r)  << std::endl;
 		return 0;
 	}
 	r = sd_bus_message_read_basic(reply, type, &basic);
@@ -200,6 +201,9 @@ static std::string getSubStatus(sd_bus *bus, std::string path) {
 }
 
 
+static sd_bus *bus = NULL;
+static bool have_bus = false;
+
 /*********************************
  * Handler
  */
@@ -208,15 +212,15 @@ class systemdHandler: public serviceHandler {
 public:
 	systemdHandler(std::shared_ptr<service> p_s):serviceHandler(p_s) {}
 	bool isBlackout() { 
-		sd_bus *bus = NULL;
-		int r = sd_bus_open_system(&bus);
+	/*	int r = sd_bus_open_system(&bus);
 		if (r < 0) {
 			std::cerr << "Failed to connect to system bus: " << strerror(-r) << std::endl;
 			sd_bus_unref(bus);
 			return false;
-		}
+		}*/
+		if (!have_bus) return false;
 		std::string res = getStatus(bus, id);
-		sd_bus_unref(bus);
+		//sd_bus_unref(bus);
 		if (res == "active") { // restarted not yet known
 			// TODO: update mainprocess
 			std::shared_ptr<service> s = serv.lock();
@@ -244,30 +248,45 @@ MAKE_PLUGIN_HANDLER(systemdHandler,systemd)
 
 class systemdDetector: public serviceDetector {
 public:
-	systemdDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server):serviceDetector(p_sm, p_server) {}
+	systemdDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server):serviceDetector(p_sm, p_server) {
+		have_bus = false;
+		int r = sd_bus_open_system(&bus);
+		if (r < 0) {
+			std::string me = "Failed to connect to system bus: ";
+			me+=strerror(-r);me+=". disabling systemD integration.";
+			server->logError("systemdDetector::", me);
+		} else
+			have_bus = true;
+	}
+	~systemdDetector() {
+		have_bus = false;
+		sd_bus_flush_close_unref(bus);
+	}
 	void find() {
 		sd_bus_error error = SD_BUS_ERROR_NULL;
 		sd_bus_message *m = NULL;
-		sd_bus *bus = NULL;
+		if (!have_bus) return;
+		//sd_bus *bus = NULL;
 		const char *path;
-		int r = sd_bus_open_system(&bus);
+		/*int r = sd_bus_open_system(&bus);
 		if (r < 0) {
 			std::cerr << "Failed to connect to system bus: " << strerror(-r) << std::endl;
 			sd_bus_unref(bus);
 			return;
-		}
+		}*/
 
-		r = sd_bus_call_method(bus,
+		int r = sd_bus_call_method(bus,
 			"org.freedesktop.systemd1",            /* service to contact */
 			"/org/freedesktop/systemd1/unit",      /* object path */
 			"org.freedesktop.DBus.Introspectable", /* interface name */
 			"Introspect",                          /* method name */
 			&error, &m, "");
 		if (r < 0) {
-			std::cerr << "Failed to issue method call: " << error.message << std::endl;
+			std::string me = "Failed to issue method call: ";me+=error.message;
+			server->logWarning("systemdDetector::find", me);
 			sd_bus_error_free(&error);
 			sd_bus_message_unref(m);
-			sd_bus_unref(bus);
+			//sd_bus_unref(bus);
 			return;
 		}
 		sd_bus_error_free(&error);
@@ -275,9 +294,10 @@ public:
 		/* Parse the response message */
 		r = sd_bus_message_read(m, "s", &path);
 		if (r < 0) {
-			std::cerr << "Failed to parse response message: " << strerror(-r) << std::endl;
+			std::string me = "Failed to parse response message: ";me+=strerror(-r);
+			server->logWarning("systemdDetector::find", me);
 			sd_bus_message_unref(m);
-			sd_bus_unref(bus);
+			//sd_bus_unref(bus);
 			return;
 		}
 
@@ -285,8 +305,9 @@ public:
 		std::string line;
 		std::shared_ptr<servicesManager> mgr = services.lock();
 		uint16_t count = 0;
-		if (!mgr) return;
+		uint16_t coun2 = 0;
 		sd_bus_message_unref(m);
+		if (!mgr) return;
 		while (std::getline(ss, line)) {
 			if (line.substr(1,5) == "<node" && line.find("service") != std::string::npos) {
 				std::string small = line.substr(line.find("\"")+1,line.rfind("\"")-line.find("\"")-1);
@@ -305,6 +326,7 @@ public:
 					std::shared_ptr<systemdHandler> hand = std::make_shared<systemdHandler>(serv);
 					hand->setID(name);
 					serv->setHandler(hand);
+					coun2++;
 				} else {
 					std::shared_ptr<process> p = std::make_shared<process>(PID);
 					if (p->getName() == "")
@@ -321,11 +343,10 @@ public:
 
 			}
 		}
-		server->logNotice("systemdDetector::find", "found "+std::to_string(count)+" services");
-		sd_bus_unref(bus);
+		server->logNotice("systemdDetector::find", "found "+std::to_string(count)+" services. updated "+std::to_string(coun2));
 	}
-private:
-	
+/*private:
+	sd_bus *bus = NULL;*/
 };
 MAKE_PLUGIN_DETECTOR(systemdDetector, systemd)
 

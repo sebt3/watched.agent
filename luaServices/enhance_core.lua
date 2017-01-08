@@ -9,7 +9,7 @@ function enhance(serv)
 		["steam"]		= { "desktop",		"game"		},
 		["kdeconnectd"]		= { "desktop",		"kde"		},
 		["watched.back"]	= { "monitoring",	"backend"	},
-		["watched.agent"]	= { "monitoring",	"frontend"	},
+		["watched.agent"]	= { "monitoring",	"agent"		},
 		["accounts-daemon"]	= { "system",		"auth"		},
 		["sddm"]		= { "system",		"auth"		},
 		["systemd-logind"]	= { "system",		"auth"		},
@@ -57,7 +57,7 @@ function enhance(serv)
 	if not (sub == "") then
 		serv.setSubType(sub)
 	end
-	if name == "rpc.statd" then
+	if name == "rpc.statd" or name == "avahi-daemon" then
 		serv.setUniqKey("dynamic")
 		serv.updateBasePaths()
 		-- as its base port is not fixed, its id would change from boot to boot

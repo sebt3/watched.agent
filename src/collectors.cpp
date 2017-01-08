@@ -30,8 +30,8 @@ void Ressource::nextValue() {
 	else
 		v.insert(v.begin(), v[0]);
 	v[0]["timestamp"] = fp_ms.count();
-	while(v.size()>=size)
-		v.pop_back();
+	if (v.size()>size)
+		v.resize(size);
 }
 
 std::string  Ressource::getHistory(double since) {
@@ -106,6 +106,7 @@ Collector::~Collector() {
 	}
 	active=false;
 	if (my_thread.joinable()) my_thread.join();
+	server->logNotice("Collector::~Collector","Deleting "+name+" collector");
 }
 
 void Collector::setService(std::shared_ptr<service> p_serv) {
@@ -179,6 +180,7 @@ std::string Collector::getHost() {
 	else
 		host = info->ai_canonname;
 
+	freeaddrinfo(info);
 	return host;
 }
 

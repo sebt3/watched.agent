@@ -5,7 +5,7 @@ table.insert(types, "enhancer")
 cfg = {}
 cfg["name"] = "mem"
 cfg["poolfreq"] = 60
-cfg["history"]  = 100
+cfg["history"]  = 25
 
 
 function declare ()

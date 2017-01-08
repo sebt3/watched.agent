@@ -1,7 +1,7 @@
 cfg = {}
 cfg["name"] = "uptime"
-cfg["poolfreq"] = 100
-cfg["history"]  = 300
+cfg["poolfreq"] = 60
+cfg["history"]  = 25
 
 
 function declare ()

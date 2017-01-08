@@ -57,6 +57,7 @@ public:
 	std::string	getName() { return base_name; }
 	std::string	getCWD();
 	std::string	getUsername();
+	std::shared_ptr< std::vector<std::string> > getOpenLogs();
 private:
 	uint32_t		pid;
 	std::string		username;
@@ -65,6 +66,36 @@ private:
 	std::string		cwd;
 	std::vector<uint32_t>	sockets;
 };
+
+/*********************************
+ * logParser
+ */
+
+class logParser {
+	// TODO: support des "logSources"
+	friend class service;
+public:
+	logParser(std::string p_logfile, Json::Value* p_cfg, uint p_history = 25, uint p_freq_pool = 60);
+	~logParser();
+	void			startThread();
+	std::string		getHistory(double since);
+protected:
+	enum levels {ok,notice,info,warning,error,critical};
+	virtual levels		getLevel(std::string p_line) =0;
+	virtual std::string	getDate (std::string p_line) =0;
+	Json::Value*			cfg;
+private:
+	void		parseLog();
+	std::vector<Json::Value>	v;
+	std::string			filename;
+	std::streampos			pos;
+	uint64_t			lineNo;
+	timer_killer			timer;
+	std::thread			my_thread;
+	bool				active;
+	std::mutex			lock;
+};
+
 /*TODO: 
  * alimenter les controlGroup avec /proc/[PID]/cgroup
  */
@@ -78,6 +109,7 @@ public:
 	service(std::shared_ptr<HttpServer> p_server);
 	service(std::shared_ptr<HttpServer> p_server, std::string p_file_path);
 	service(const service& p_src);
+	~service() { server->logNotice("service::~service","Deleting "+name+" service"); }
 	void		updateFrom(std::shared_ptr<service> src);
 
 	bool		operator==(const std::string rhs);
@@ -107,12 +139,15 @@ public:
 
 	void		saveConfigTemplate(std::string p_cfg_dir);
 	void		getIndexHtml(std::stringstream& stream );
+	void		getJsonLogHistory(Json::Value* ref, double since);
 	void		getJsonStatus(Json::Value* ref);
 	void		getJson(Json::Value* p_defs);
 	void		addCollector(const std::string p_name);
+	void		addLogMonitor(const std::string p_logmonName, const std::string p_filematch);
 	std::shared_ptr<Collector>	getCollector(std::string p_name);
 	std::shared_ptr<process>	getProcess(uint32_t p_pid);
 	Json::Value* 	getCollectorCfg(std::string p_name);
+	Json::Value* 	getParserCfg(std::string p_name);
 	void		getCollectorsHtml(std::stringstream& stream );
 	std::shared_ptr< std::vector<uint32_t> >	getPIDs();
 protected:
@@ -130,6 +165,7 @@ private:
 	std::vector< std::shared_ptr<socket> >		sockets;
 	std::vector< std::shared_ptr<process> >		mainProcess;
 	std::map< std::string, std::shared_ptr<Collector> >	collectors;
+	std::map< std::string, std::shared_ptr<logParser> >	parsers;
 	std::vector< std::shared_ptr<process> >		subProcess;
 	std::shared_ptr<HttpServer>			server;
 };
@@ -192,6 +228,7 @@ public:
 	bool	havePID(uint32_t p_pid);
 	void	doGetJson(response_ptr response, request_ptr request);
 	void	doGetServiceStatus(response_ptr response, request_ptr request);
+	void	doGetServiceLog(response_ptr response, request_ptr request);
 	void	doGetServiceHtml(response_ptr response, request_ptr request);
 	void	doGetCollectorHistory(response_ptr response, request_ptr request);
 	void	doGetCollectorGraph(response_ptr response, request_ptr request);
@@ -219,24 +256,37 @@ typedef std::shared_ptr<service>         service_maker_t(const service& p_src);
 typedef std::shared_ptr<serviceHandler>  handler_maker_t(std::shared_ptr<service> p_s);
 typedef std::shared_ptr<serviceDetector> detector_maker_t(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server);
 typedef std::shared_ptr<serviceEnhancer> enhancer_maker_t(std::shared_ptr<servicesManager> p_sm);
+typedef std::shared_ptr<logParser> 	 parser_maker_t(const std::string p_logname, Json::Value* p_cfg, const std::string p_luafile);
 typedef std::shared_ptr<Collector> 	 service_collector_maker_t(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string p_filename);
 extern std::map<std::string, service_maker_t* >  serviceFactory;
 extern std::map<std::string, handler_maker_t* >  handlerFactory;
 extern std::map<std::string, detector_maker_t* > detectorFactory;
 extern std::map<std::string, enhancer_maker_t* > enhancerFactory;
+extern std::map<std::string, std::pair<parser_maker_t*,std::string> > parserFactory;
 extern std::map<std::string, std::pair<service_collector_maker_t*,std::string> > serviceCollectorFactory;
 }
 
+#define MAKE_PLUGIN_LOG_PARSER(className,id)					\
+extern "C" {									\
+std::shared_ptr<logParser> makerLPars_##id(const std::string p_logname, Json::Value* p_cfg, const std::string p_luafile) {	\
+   return std::make_shared<className>(p_logname, p_cfg);			\
+}										\
+}										\
+class proxyLPars_##id { public:							\
+   proxyLPars_##id(){ parserFactory[#id] = std::make_pair(makerLPars_##id,""); } \
+};										\
+proxyLPars_##id p_##id;
+
 #define MAKE_PLUGIN_SERVICE_COLLECTOR(className,id)				\
 extern "C" {									\
-std::shared_ptr<Collector> makerSCol_##id(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s){	\
+std::shared_ptr<Collector> makerSCol_##id(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string p_fname){	\
    return std::make_shared<className>(p_srv, p_cfg, p_s);			\
 }										\
 }										\
 class proxySCol_##id { public:							\
-   proxySCol_##id(){ serviceCollectorFactory[#id] = std::make_pair(makerSCol_##id,""); }		\
+   proxySCol_##id(){ serviceCollectorFactory[#id] = std::make_pair(makerSCol_##id,""); } \
 };										\
-proxySCol_##id p;
+proxySCol_##id p_##id;
 
 #define MAKE_PLUGIN_SERVICE(className,id)					\
 extern "C" {									\

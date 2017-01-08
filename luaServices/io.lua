@@ -54,7 +54,6 @@ function collect ()
 		this.setDProperty("io", "rd", res_reads)
 		this.setDProperty("io", "wr", res_writes)
 	end
-	prev_total_time = total_time
 end
 
 function enhance(serv)

@@ -49,7 +49,7 @@ void LuaCollector::setPropD(std::string p_res, std::string p_name, double val)
 { ressources[p_res]->setProperty(p_name, val); }
 
 void LuaCollector::getPIDList() {
-	state("pids = {}");
+	state("if type(pids) == \"table\" then while not ( type(pids[1]) == \"nil\" ) do table.remove(pids); end else pids={} end");
 	if (haveService) {
 		std::shared_ptr<service> serv_p = onService.lock();
 		if (serv_p) {
@@ -69,8 +69,40 @@ void LuaCollector::collect() {
 }
 
 
+/*********************************
+ * LuaParser
+ */
 
+LuaParser::LuaParser(const std::string p_logname, Json::Value* p_cfg, const std::string p_luafile) : logParser(p_logname, p_cfg,0,0), have_state(true)  {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	state.Load(p_luafile);
+	std::string cmd="ok="+std::to_string(ok)+";notice="+std::to_string(notice)+";info="+std::to_string(info)+";warning="+std::to_string(warning)+";error="+std::to_string(error)+";critical="+std::to_string(critical);
+	state(cmd.c_str());
+	if(! cfg->isMember("history")) (*cfg)["history"] = (int)state["cfg"]["history"];
+	if(! cfg->isMember("poll-frequency")) (*cfg)["poll-frequency"] = (int)state["cfg"]["poolfreq"];
+}
 
+LuaParser::~LuaParser() {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	have_state = false;
+}
+
+logParser::levels	LuaParser::getLevel(std::string p_line) {
+	std::unique_lock<std::mutex> locker(lua);  // Lua isnt exactly thread safe
+	if (have_state) {
+		int ret = state["getLevel"](p_line);
+		return (logParser::levels)ret;
+	}
+	return ok;
+}
+
+std::string		LuaParser::getDate (std::string p_line) {
+	std::unique_lock<std::mutex> locker(lua);  // Lua isnt exactly thread safe
+	if (have_state) {
+		return state["getDate"](p_line);
+	}
+	return "";
+}
 
 /*********************************
  * LuaSorter
@@ -109,18 +141,19 @@ std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_
 	if (!have_state) 
 		return nullptr;
 	state["p_serv"].SetObj(*p_serv,
-		"addCollector",	&service::addCollector,
-		"havePID",	&service::havePID,
-		"getType",	&service::getType,
-		"getSubType",	&service::getSubType,
-		"getName",	&service::getName,
-		"getID",	&service::getID,
-		"setType",	&service::setType,
-		"setSubType",	&service::setSubType,
-		"setUniqKey",	&service::setUniqKey,
-		"setHost",	&service::setHost,
-		"updateBasePaths", &service::updateBasePaths,
-		"setName",	&service::setName
+		"addCollector",		&service::addCollector,
+		"havePID",		&service::havePID,
+		"getType",		&service::getType,
+		"getSubType",		&service::getSubType,
+		"getName",		&service::getName,
+		"getID",		&service::getID,
+		"setType",		&service::setType,
+		"setSubType",		&service::setSubType,
+		"setUniqKey",		&service::setUniqKey,
+		"setHost",		&service::setHost,
+		"addLogMonitor",	&service::addLogMonitor,
+		"updateBasePaths",	&service::updateBasePaths,
+		"setName",		&service::setName
 	);
 
 	state("enhance(p_serv)");

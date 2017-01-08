@@ -86,6 +86,22 @@ private:
 };
 
 /*********************************
+ * LuaCollector
+ */
+class LuaParser : public logParser {
+public:
+	LuaParser(const std::string p_logname, Json::Value* p_cfg, const std::string p_luafile);
+	~LuaParser();
+
+	logParser::levels	getLevel(std::string p_line);
+	std::string		getDate (std::string p_line);
+private:
+	sel::State	state{true};
+	bool		have_state;
+	std::mutex	lua;
+};
+
+/*********************************
  * LuaSorter
  * find what type of service management plugin a lua file contain
  */

@@ -59,7 +59,7 @@ public:
 
 class diskUsageCollector : public Collector {
 public:
-	diskUsageCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("diskusage", p_srv, p_cfg, 100, 300) {
+	diskUsageCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("diskusage", p_srv, p_cfg, 25, 60) {
 		addGetMetricRoute();
 	}
 

@@ -26,6 +26,7 @@ std::map<std::string, detector_maker_t* > detectorFactory;
 std::map<std::string, enhancer_maker_t* > enhancerFactory;
 std::map<std::string, handler_maker_t*  >  handlerFactory;
 std::map<std::string, service_maker_t*  >  serviceFactory;
+std::map<std::string, std::pair<parser_maker_t*,std::string> >		  parserFactory;
 std::map<std::string, std::pair<service_collector_maker_t*,std::string> > serviceCollectorFactory;
 servicesManager::servicesManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg) : active(false), server(p_server), cfg(p_cfg) {}
 void servicesManager::init() {
@@ -119,6 +120,12 @@ void servicesManager::init() {
 							return std::make_shared<LuaCollector>(p_srv, p_cfg, p_fname, p_s);
 						}, full_file_name);
 				}
+				if (q->isType("logParser") && (parserFactory.find(name) == parserFactory.end())) {
+					parserFactory[name] = std::make_pair(
+						[](const std::string p_logname, Json::Value* p_cfg, const std::string p_luafile) -> std::shared_ptr<logParser> {
+							return std::make_shared<LuaParser>(p_logname, p_cfg, p_luafile);
+						}, full_file_name);
+				}
 				if (q->isType("enhancer")) {
 					enhancers.push_back(std::make_shared<LuaServiceEnhancer>(shared_from_this(), full_file_name));
 				}
@@ -140,6 +147,8 @@ void servicesManager::init() {
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	associate(server,"GET","^/$",doGetRootPage);
 	associate(server,"GET","^/service/(.*)/status$",doGetServiceStatus);
+	associate(server,"GET","^/service/(.*)/log$",doGetServiceLog);
+	associate(server,"GET","^/service/(.*)/log.since=([0-9.]*)$",doGetServiceLog);
 	associate(server,"GET","^/service/(.*)/html$",doGetServiceHtml);
 	associate(server,"GET","^.service/(.*)/(.*)/(.*)/history$",doGetCollectorHistory);
 	associate(server,"GET","^/service/(.*)/(.*)/(.*)/history.since=([0-9.]*)$",doGetCollectorHistory);
@@ -271,6 +280,43 @@ void	servicesManager::doGetServiceStatus(response_ptr response, request_ptr requ
 	ss << res;
 	setResponseJson(response, ss.str());
 }
+
+void	servicesManager::doGetServiceLog(response_ptr response, request_ptr request) {
+	std::stringstream ss;
+	std::string id  = (*request)[0];
+	double since  = -1;
+	if (request->size()>1) {
+		try {
+			since=stod((*request)[1]);
+		} catch (std::exception &e) { }
+	}
+	Json::Value arr(Json::arrayValue);
+	Json::Value res(Json::objectValue);
+	if (id == "all") {
+		for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
+			res[(*i)->getID()] = arr;
+			(*i)->getJsonLogHistory( &(res[(*i)->getID()]), since);
+		}
+		ss << res;
+		setResponseJson(response, ss.str());
+		return;
+	}
+
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
+		if ( *(*i) == id) {
+			res = arr;
+			(*i)->getJsonLogHistory( &res, since);
+			ss << res;
+			setResponseJson(response, ss.str());
+			return;
+		}
+	}
+	// returning an error
+	res["error"] = "No service matching '"+id+"' found";
+	ss << res;
+	setResponseJson(response, ss.str());
+}
+
 
 void	servicesManager::doGetServiceHtml(response_ptr response, request_ptr request) {
 	std::stringstream ss;
@@ -425,6 +471,18 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 	res["definitions"]["serviceSocket"]["requiered"][0]			= "name";
 	res["definitions"]["serviceSocket"]["requiered"][1]			= "status";
 	res["definitions"]["serviceSocket"]["x-isService"]			= false;
+	res["definitions"]["serviceLog"]["properties"]["level"]["type"]		= "string";
+	res["definitions"]["serviceLog"]["properties"]["date_mark"]["type"]	= "string";
+	res["definitions"]["serviceLog"]["properties"]["line_no"]["type"]	= "number";
+	res["definitions"]["serviceLog"]["properties"]["source"]["type"]	= "string";
+	res["definitions"]["serviceLog"]["properties"]["text"]["type"]		= "string";
+	res["definitions"]["serviceLog"]["properties"]["timestamp"]["format"]	= "double";
+	res["definitions"]["serviceLog"]["properties"]["timestamp"]["type"]	= "number";
+	res["definitions"]["serviceLog"]["requiered"][0]			= "level";
+	res["definitions"]["serviceLog"]["requiered"][1]			= "date_mark";
+	res["definitions"]["serviceLog"]["requiered"][2]			= "line_no";
+	res["definitions"]["serviceLog"]["requiered"][3]			= "timestamp";
+	res["definitions"]["serviceLog"]["x-isService"]				= false;
 	res["definitions"]["services"]["properties"]["host"]["type"]		= "string";
 	res["definitions"]["services"]["properties"]["process"]["type"]		= "array";
 	res["definitions"]["services"]["properties"]["process"]["items"]["type"]= "#/definitions/serviceProcess";
@@ -453,6 +511,7 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 void socketDetector::find(void) {
 	std::shared_ptr<servicesManager> mgr = services.lock();
 	uint16_t count = 0;
+	uint16_t coun2 = 0;
 	if (!mgr) return;
 	std::map<std::string,std::string> files;
 	files["tcp"]  = "/proc/net/tcp";
@@ -501,6 +560,7 @@ void socketDetector::find(void) {
 			for(std::vector< std::shared_ptr<socket> >::iterator i = sockets.begin(); i != sockets.end();i++) {
 				if (!serv->haveSocket((*i)->getID())) continue;
 				serv->setSocket(*i);
+				coun2++;
 			}
 			continue;
 		}
@@ -528,7 +588,7 @@ void socketDetector::find(void) {
 		}
 	}
 	closedir (dir);
-	server->logNotice("socketDetector::find", "found "+std::to_string(count)+" services");
+	server->logNotice("socketDetector::find", "found "+std::to_string(count)+" services, updated "+std::to_string(coun2));
 	// TODO: do something with the non-matching sockets too
 }
 

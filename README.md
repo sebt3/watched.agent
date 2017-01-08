@@ -35,6 +35,7 @@ Complete instructions [here](https://sebt3.github.io/watched/doc/install/#the-ag
 - Detect network services and monitor them
 - Service performance data
 - Service classification
+- Service log monitoring
 - Can be secured using SSL (tls1.2)
 - Offer a web micro frontend (might be used to monitor a single host)
 - Plugins for :
@@ -44,7 +45,6 @@ Complete instructions [here](https://sebt3.github.io/watched/doc/install/#the-ag
 
 ## Planned
 - Lua plugins support for services detection, handler
-- Service log monitoring
 - Plugins for :
   * systemd log monitoring
   * docker services detection, enhencement
