@@ -150,7 +150,7 @@ void servicesManager::init() {
 	associate(server,"GET","^/service/(.*)/log$",doGetServiceLog);
 	associate(server,"GET","^/service/(.*)/log.since=([0-9.]*)$",doGetServiceLog);
 	associate(server,"GET","^/service/(.*)/html$",doGetServiceHtml);
-	associate(server,"GET","^.service/(.*)/(.*)/(.*)/history$",doGetCollectorHistory);
+	associate(server,"GET","^/service/(.*)/(.*)/(.*)/history$",doGetCollectorHistory);
 	associate(server,"GET","^/service/(.*)/(.*)/(.*)/history.since=([0-9.]*)$",doGetCollectorHistory);
 	associate(server,"GET","^/service/(.*)/(.*)/(.*)/graph$",doGetCollectorGraph);
 	associate(server,"GET","^/api/swagger.json$",doGetJson);
@@ -326,28 +326,44 @@ void	servicesManager::doGetServiceHtml(response_ptr response, request_ptr reques
 		if ( *(*i) == id) {
 			ss << server->getHead("Service", (*i)->getID());
 			(*i)->getJsonStatus( &res );
-			ss << "<div class=\"row\"><div class=\"col-md-4\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Properties</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><tr><th>name</th><td>"+res["properties"]["name"].asString()+"</td></tr><tr><th>type</th><td>"+res["properties"]["type"].asString()+"</td></tr><tr><th>subType</th><td>"+res["properties"]["subType"].asString()+"</td></tr><tr><th>Identifier</th><td>"+res["properties"]["uniqName"].asString()+"</td></tr><tr><th>hostname</th><td>"+res["properties"]["host"].asString()+"</td></tr></table></div></div></div><div class=\"col-md-8\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Process</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>name</th><th>path</th><th>cwd</th><th>username</th><th>PID</th><th>status</th></tr></thead><tbody>\n";
+			ss << "<div class=\"row\"><div class=\"col-md-4\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Properties</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><tr><th>name</th><td>"+res["properties"]["name"].asString()+"</td></tr><tr><th>type</th><td>"+res["properties"]["type"].asString()+"</td></tr><tr><th>subType</th><td>"+res["properties"]["subType"].asString()+"</td></tr><tr><th>Identifier</th><td>"+res["properties"]["uniqName"].asString()+"</td></tr><tr><th>hostname</th><td>"+res["properties"]["host"].asString()+"</td></tr></table></div></div>";
+			if (res["sockets"].size()>0) {
+				ss << "<div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Sockets</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>listen</th><th>status</th></tr></thead><tbody>\n";
+				for (Json::Value::iterator j = res["sockets"].begin();j!=res["sockets"].end();j++) {
+					std::string color = "green";
+					if ((*j)["status"].asString() != "ok") 
+						color = "red";
+					ss << "<tr><td>"+(*j)["name"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
+				}
+				ss << "</tbody></table></div></div>";
+			}
+			ss << "</div><div class=\"col-md-8\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Process</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>name</th><th>path</th><th>cwd</th><th>username</th><th>PID</th><th>status</th></tr></thead><tbody>\n";
 			for (Json::Value::iterator j = res["process"].begin();j!=res["process"].end();j++) {
 				std::string color = "green";
 				if ((*j)["status"].asString() != "ok") 
 					color = "red";
 				ss << "<tr><td>"+(*j)["name"].asString()+"</td><td>"+(*j)["full_path"].asString()+"</td><td>"+(*j)["cwd"].asString()+"</td><td>"+(*j)["username"].asString()+"</td><td>"+(*j)["pid"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
 			}
-			ss << "</tbody></table></div></div><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Sockets</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>listen</th><th>status</th></tr></thead><tbody>\n";
-			for (Json::Value::iterator j = res["sockets"].begin();j!=res["sockets"].end();j++) {
-				std::string color = "green";
-				if ((*j)["status"].asString() != "ok") 
-					color = "red";
-				ss << "<tr><td>"+(*j)["name"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
+			ss << "</tbody></table></div></div>";
+			if (res["subprocess"].size()>0) {
+				ss << "<div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">subProcess</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>name</th><th>path</th><th>cwd</th><th>username</th><th>PID</th></tr></thead><tbody>\n";
+				for (Json::Value::iterator j = res["subprocess"].begin();j!=res["subprocess"].end();j++) {
+					std::string color = "green";
+					if ((*j)["status"].asString() != "ok") 
+						color = "red";
+					ss << "<tr><td>"+(*j)["name"].asString()+"</td><td>"+(*j)["full_path"].asString()+"</td><td>"+(*j)["cwd"].asString()+"</td><td>"+(*j)["username"].asString()+"</td><td>"+(*j)["pid"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
+				}
+				ss << "</tbody></table></div></div>";
 			}
-			ss << "</tbody></table></div></div><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">subProcess</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>name</th><th>path</th><th>cwd</th><th>username</th><th>PID</th><th>status</th></tr></thead><tbody>\n";
-			for (Json::Value::iterator j = res["subprocess"].begin();j!=res["subprocess"].end();j++) {
-				std::string color = "green";
-				if ((*j)["status"].asString() != "ok") 
-					color = "red";
-				ss << "<tr><td>"+(*j)["name"].asString()+"</td><td>"+(*j)["full_path"].asString()+"</td><td>"+(*j)["cwd"].asString()+"</td><td>"+(*j)["username"].asString()+"</td><td>"+(*j)["pid"].asString()+"</td><td class=\"text-"+color+"\">"+(*j)["status"].asString()+"</td></tr>\n";
+			(*i)->getJsonLogHistory( &res, -1 );
+			if (res["entries"].size()>0) {
+				ss << "<div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Log entries</h3></div><div class=\"box-body\"><table class=\"table table-striped table-hover\"><thead><tr><th>level</th><th>date</th><th>source</th><th>line #</th><th>text</th></tr></thead><tbody>\n";
+				for (Json::Value::iterator j = res["entries"].begin();j!=res["entries"].end();j++) {
+					ss << "<tr><td>"+(*j)["level"].asString()+"</td><td>"+(*j)["date_mark"].asString()+"</td><td>"+(*j)["source"].asString()+"</td><td>"+(*j)["line_no"].asString()+"</td><td>"+(*j)["text"].asString()+"</td></tr>\n";
+				}
+				ss << "</tbody></table></div></div>";
 			}
-			ss << "</tbody></table></div></div></div></div>\n<div class=\"row\">";
+			ss << "</div></div>\n<div class=\"row\">";
 			(*i)->getCollectorsHtml(ss);
 			ss << "</div>\n";
 			ss << server->getFoot("");
@@ -496,6 +512,10 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 	res["paths"]["/service/all/status"]["get"]["responses"]["200"]["schema"]["type"] = "object";
 	res["paths"]["/service/all/status"]["get"]["responses"]["200"]["schema"]["additionalProperties"]["$ref"] = "#/definitions/services";
 	res["paths"]["/service/all/status"]["get"]["summary"]			= "All services status";
+	res["paths"]["/service/all/log"]["get"]["responses"]["200"]["description"] = "All services log events";
+	res["paths"]["/service/all/log"]["get"]["responses"]["200"]["schema"]["type"] = "object";
+	res["paths"]["/service/all/log"]["get"]["responses"]["200"]["schema"]["additionalProperties"]["$ref"] = "#/definitions/serviceLog";
+	res["paths"]["/service/all/log"]["get"]["summary"]			= "All services status";
 	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++)
 		(*i)->getJson(&res);
 
