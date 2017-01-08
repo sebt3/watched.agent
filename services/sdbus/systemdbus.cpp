@@ -343,7 +343,7 @@ public:
 
 			}
 		}
-		server->logNotice("systemdDetector::find", "found "+std::to_string(count)+" services. updated "+std::to_string(coun2));
+		server->logInfo("systemdDetector::find", "found "+std::to_string(count)+" services. updated "+std::to_string(coun2));
 	}
 /*private:
 	sd_bus *bus = NULL;*/

@@ -46,7 +46,7 @@ void default_resource_send(std::shared_ptr<SWHttpServer> server, std::shared_ptr
 				if(!ec)
 					default_resource_send(server, response, ifs, buffer);
 				/*else
-					logNotice("Connection interrupted while sending a static file over HTTP");*/
+					logInfo("Connection interrupted while sending a static file over HTTP");*/
 			});
 		}
 	}
@@ -62,7 +62,7 @@ void defaults_resource_send(std::shared_ptr<SWHttpsServer> server, std::shared_p
 				if(!ec)
 					defaults_resource_send(server, response, ifs, buffer);
 				/*else
-					logNotice("Connection interrupted while sending a static file over HTTPS");*/
+					logInfo("Connection interrupted while sending a static file over HTTPS");*/
 			});
 		}
 	}

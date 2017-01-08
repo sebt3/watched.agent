@@ -17,8 +17,8 @@ log::log(Json::Value* p_cfg) : cfg(p_cfg) {
 		(*cfg)["file"].setComment(std::string("/*\t\tthe log file*/"), Json::commentAfterOnSameLine);
 	}
 	if(! cfg->isMember("level") ) {
-		(*cfg)["level"] = "INFO";
-		(*cfg)["level"].setComment(std::string("/*\t\tlevel to log at (NONE,ERROR,WARN,INFO,NOTICE,DEBUG,ALL)*/"), Json::commentAfterOnSameLine);
+		(*cfg)["level"] = "NOTICE";
+		(*cfg)["level"].setComment(std::string("/*\t\tlevel to log at (NONE,ERROR,WARN,NOTICE,INFO,DEBUG,ALL)*/"), Json::commentAfterOnSameLine);
 	}
 	lvl = (*cfg)["level"].asString();
 	std::transform(lvl.begin(), lvl.end(), lvl.begin(),  [](unsigned char c) { return std::toupper(c); });
@@ -29,7 +29,7 @@ log::log(Json::Value* p_cfg) : cfg(p_cfg) {
 			level = i;
 		}
 	}
-	if(!found) level=4;
+	if(!found) level=3;
 	(*cfg)["level"] = levels[level];
 }
 
@@ -65,11 +65,11 @@ void log::write(std::string p_lvl, const std::string p_src, std::string p_messag
 
 void log::error(  const std::string p_src, std::string p_message) {write(1,p_src,p_message); }
 void log::warning(const std::string p_src, std::string p_message) {write(2,p_src,p_message); }
-void log::info(   const std::string p_src, std::string p_message) {write(3,p_src,p_message); }
-void log::notice( const std::string p_src, std::string p_message) {write(4,p_src,p_message); }
+void log::notice( const std::string p_src, std::string p_message) {write(3,p_src,p_message); }
+void log::info(   const std::string p_src, std::string p_message) {write(4,p_src,p_message); }
 void log::debug(  const std::string p_src, std::string p_message) {write(5,p_src,p_message); }
 
-const std::vector<std::string> log :: levels ({"NONE","ERROR","WARN","INFO","NOTICE","DEBUG","ALL"});
+const std::vector<std::string> log :: levels ({"NONE","ERROR","WARN","NOTICE","INFO","DEBUG","ALL"});
 
 
 }

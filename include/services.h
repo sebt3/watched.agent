@@ -80,7 +80,7 @@ public:
 	void			startThread();
 	std::string		getHistory(double since);
 protected:
-	enum levels {ok,notice,info,warning,error,critical};
+	enum levels {ok,info,notice,warning,error,critical};
 	virtual levels		getLevel(std::string p_line) =0;
 	virtual std::string	getDate (std::string p_line) =0;
 	Json::Value*			cfg;

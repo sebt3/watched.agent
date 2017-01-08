@@ -154,7 +154,7 @@ void servicesManager::init() {
 	associate(server,"GET","^/service/(.*)/(.*)/(.*)/history.since=([0-9.]*)$",doGetCollectorHistory);
 	associate(server,"GET","^/service/(.*)/(.*)/(.*)/graph$",doGetCollectorGraph);
 	associate(server,"GET","^/api/swagger.json$",doGetJson);
-	server->logInfo("servicesManager::", "watched.agent started and ready.");
+	server->logNotice("servicesManager::", "watched.agent started and ready.");
 }
 
 servicesManager::~servicesManager() {
@@ -608,7 +608,7 @@ void socketDetector::find(void) {
 		}
 	}
 	closedir (dir);
-	server->logNotice("socketDetector::find", "found "+std::to_string(count)+" services, updated "+std::to_string(coun2));
+	server->logInfo("socketDetector::find", "found "+std::to_string(count)+" services, updated "+std::to_string(coun2));
 	// TODO: do something with the non-matching sockets too
 }
 

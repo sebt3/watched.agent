@@ -791,7 +791,7 @@ void	service::addLogMonitor(std::string p_logmonName, std::string p_filematch) {
 	}
 	parsers[p_filematch] = parserFactory[p_logmonName].first(logfile, getParserCfg(p_logmonName), parserFactory[p_logmonName].second);
 	parsers[p_filematch]->startThread();
-	server->logInfo("service::addLogMonitor", "added "+p_logmonName+" log("+logfile+") parser to "+name+" service");
+	server->logNotice("service::addLogMonitor", "added "+p_logmonName+" log("+logfile+") parser to "+name+" service");
 }
 
 void	service::updateFrom(std::shared_ptr<service> src) {

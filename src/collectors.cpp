@@ -106,7 +106,7 @@ Collector::~Collector() {
 	}
 	active=false;
 	if (my_thread.joinable()) my_thread.join();
-	server->logNotice("Collector::~Collector","Deleting "+name+" collector");
+	server->logInfo("Collector::~Collector","Deleting "+name+" collector");
 }
 
 void Collector::setService(std::shared_ptr<service> p_serv) {
@@ -126,7 +126,7 @@ void Collector::startThread() {
 					std::unique_lock<std::mutex> locker(lock);
 					if (active) {// if we've been locked by the destructor...
 						collect();
-						server->logNotice("Collector::thread", basePath+name+" updated");
+						server->logInfo("Collector::thread", basePath+name+" updated");
 					}
 				}
 				timer.wait_for(std::chrono::seconds(sec));
@@ -247,7 +247,7 @@ void Collector::doGetHistory(response_ptr response, request_ptr request) {
 	// jsoncpp isnt thread safe
 	std::unique_lock<std::mutex> locker(lock);
 	setResponseJson(response, ressources[name]->getHistory(since));
-	server->logNotice("Collector::doGetHistory", basePath+this->name+"/"+name+"/history sent");
+	server->logInfo("Collector::doGetHistory", basePath+this->name+"/"+name+"/history sent");
 }
 
 void Collector::getIndexHtml(std::stringstream& stream ){
