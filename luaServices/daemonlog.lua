@@ -13,7 +13,7 @@ function getLevel (text)
 end
 
 function getDate (text)
-	return text:match("%[(.-)%]")
+	return text:match("%a+ +%d+ +%d+:%d+:%d+")
 end
 
 function enhance(serv)
