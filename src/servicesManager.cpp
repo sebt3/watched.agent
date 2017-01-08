@@ -290,11 +290,11 @@ void	servicesManager::doGetServiceLog(response_ptr response, request_ptr request
 			since=stod((*request)[1]);
 		} catch (std::exception &e) { }
 	}
-	Json::Value arr(Json::arrayValue);
+	Json::Value obj(Json::objectValue);
 	Json::Value res(Json::objectValue);
 	if (id == "all") {
 		for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
-			res[(*i)->getID()] = arr;
+			res[(*i)->getID()] = obj;
 			(*i)->getJsonLogHistory( &(res[(*i)->getID()]), since);
 		}
 		ss << res;
@@ -304,7 +304,7 @@ void	servicesManager::doGetServiceLog(response_ptr response, request_ptr request
 
 	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
 		if ( *(*i) == id) {
-			res = arr;
+			res = obj;
 			(*i)->getJsonLogHistory( &res, since);
 			ss << res;
 			setResponseJson(response, ss.str());

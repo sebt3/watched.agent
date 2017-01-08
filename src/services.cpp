@@ -685,12 +685,15 @@ void	service::getIndexHtml(std::stringstream& stream ) {
 }
 
 void	service::getJsonLogHistory(Json::Value* ref, double since) {
+	Json::Value arr(Json::arrayValue);
+	(*ref)["entries"] = arr;
+	(*ref)["host"]    = host;
 	for(std::map< std::string, std::shared_ptr<logParser> >::iterator i=parsers.begin();i!=parsers.end();i++) {
 		if (i->second->v.size()>=1) for(int j=i->second->v.size()-1;j>=0;j--) {
 			if (i->second->v[j].isMember("timestamp") && i->second->v[j]["timestamp"].asDouble() >= since) {
 				Json::Value add = i->second->v[j];
 				add["source"]   = i->first;
-				ref->append(add);
+				(*ref)["entries"].append(add);
 			}
 		}
 	}
