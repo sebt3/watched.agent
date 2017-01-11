@@ -1,5 +1,4 @@
-types = {}
-table.insert(types, "enhancer")
+types = {"enhancer"}
 
 function enhance(serv)
 	lookup = lookup or { --			type		subType
@@ -64,3 +63,17 @@ function enhance(serv)
 		-- which is not desirable. So hard coding one here
 	end
 end
+
+
+-- Demo handler:
+-- table.insert(types, "handler")
+-- function isBackout(serv)
+--	if serv.getName() == "none" then
+-- 		return false
+-- 	end
+--	return true
+-- end
+-- Demo detector:
+-- table.insert(types, "detector")
+-- function find()
+-- end

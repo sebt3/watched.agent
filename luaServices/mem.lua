@@ -1,6 +1,4 @@
-types = {}
-table.insert(types, "collector")
-table.insert(types, "enhancer")
+types = {"collector", "enhancer"}
 
 cfg = {}
 cfg["name"] = "mem"

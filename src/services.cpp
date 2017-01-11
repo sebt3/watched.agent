@@ -416,6 +416,14 @@ void	service::addCollector(const std::string p_name) {
 	collectors[p_name]->startThread();
 }
 
+void	service::setHandler(const std::string p_name) {
+	if ( collectors.find(p_name) != collectors.end())
+		return; // already added
+	if ( handlerFactory.find(p_name) == handlerFactory.end())
+		return; // no factory matching this name
+	setHandlerObj(handlerFactory[p_name].first(shared_from_this(), serviceCollectorFactory[p_name].second));
+}
+
 void	service::updateBasePaths() {
 	for(std::map< std::string, std::shared_ptr<Collector> >::iterator i=collectors.begin();i!=collectors.end();i++)
 		i->second->setService(shared_from_this());

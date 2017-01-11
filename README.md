@@ -44,7 +44,6 @@ Complete instructions [here](https://sebt3.github.io/watched/doc/install/#the-ag
   * System CPU, memory, uptime, disk, IO, and network metrics
 
 ## Planned
-- Lua plugins support for services detection, handler
 - Plugins for :
   * systemd log monitoring
   * docker services detection, enhencement

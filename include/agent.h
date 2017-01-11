@@ -127,7 +127,31 @@ private:
 	std::mutex	lua;
 };
 
+/*********************************
+ * LuaServiceHandler
+ */
+class LuaServiceHandler: public serviceHandler {
+public:
+	LuaServiceHandler(std::shared_ptr<service> p_s, const std::string p_fname);
+	bool isBlackout();
+private:
+	sel::State state{true};
+	bool		have_state;
+	std::mutex	lua;
+};
 
+/*********************************
+ * LuaDetector
+ */
+class LuaDetector: public serviceDetector {
+public:
+	LuaDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, const std::string p_fname);
+	void find();
+private:
+	sel::State state{true};
+	bool		have_state;
+	std::mutex	lua;
+};
 /*********************************
  * SocketDetector
  */

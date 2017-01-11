@@ -325,7 +325,7 @@ public:
 					if (serv->haveHandler()) continue;
 					std::shared_ptr<systemdHandler> hand = std::make_shared<systemdHandler>(serv);
 					hand->setID(name);
-					serv->setHandler(hand);
+					serv->setHandlerObj(hand);
 					coun2++;
 				} else {
 					std::shared_ptr<process> p = std::make_shared<process>(PID);
@@ -336,7 +336,7 @@ public:
 					hand->setID(name);
 					serv->setUniqKey(small);
 					serv->addMainProcess(p);
-					serv->setHandler(hand);
+					serv->setHandlerObj(hand);
 					mgr->addService(serv);
 					count++;
 				}

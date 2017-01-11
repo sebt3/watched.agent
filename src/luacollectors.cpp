@@ -22,9 +22,11 @@ LuaCollector::LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg
 		std::shared_ptr<service> serv_p = onService.lock();
 		if (serv_p) {
 			state["service"].SetObj(*serv_p,
-				"setType",	&service::setType,
-				"setHost",	&service::setHost,
-				"setName",	&service::setName
+				"havePID",		&service::havePID,
+				"getType",		&service::getType,
+				"getSubType",		&service::getSubType,
+				"getName",		&service::getName,
+				"getID",		&service::getID
 			);
 		}
 	}
@@ -151,6 +153,7 @@ std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_
 		"setSubType",		&service::setSubType,
 		"setUniqKey",		&service::setUniqKey,
 		"setHost",		&service::setHost,
+		"setHandler",		&service::setHandler,
 		"addLogMonitor",	&service::addLogMonitor,
 		"updateBasePaths",	&service::updateBasePaths,
 		"setName",		&service::setName
@@ -158,6 +161,74 @@ std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_
 
 	state("enhance(p_serv)");
 	return nullptr;
+}
+
+
+/*********************************
+ * LuaServiceEnhancer
+ */
+LuaServiceHandler::LuaServiceHandler(std::shared_ptr<service> p_s, const std::string p_fname): serviceHandler(p_s),have_state(true) {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	state.Load(p_fname);
+}
+
+bool	LuaServiceHandler::isBlackout() {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	if (!have_state) 
+		return false;
+	std::shared_ptr<service> s = serv.lock();
+	if(!s) return false;
+
+	state["p_serv"].SetObj(*s,
+		"havePID",		&service::havePID,
+		"getType",		&service::getType,
+		"getSubType",		&service::getSubType,
+		"getName",		&service::getName,
+		"getID",		&service::getID
+	);
+
+	state("p_ret = isBlackout(p_serv)");
+	return state["p_ret"];
+}
+
+/*********************************
+ * LuaDetector
+ */
+LuaDetector::LuaDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, const std::string p_fname):serviceDetector(p_sm, p_server) {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	state.Load(p_fname);
+}
+
+void	LuaDetector::find() {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	if (!have_state) 
+		return;
+	std::shared_ptr<servicesManager> mgr = services.lock();
+	if(!mgr) return;
+	state["mgr"].SetObj(*mgr,
+//		"addService",		&servicesManager::addService,
+		"haveSocket",		&servicesManager::haveSocket,
+		"havePID",		&servicesManager::havePID
+	);
+	//TODO: add the ability to create service and add them to the manager working around the shared_ptr issue
+/*	state["service"].SetClass<service>(
+		"addCollector",		&service::addCollector,
+		"havePID",		&service::havePID,
+		"getType",		&service::getType,
+		"getSubType",		&service::getSubType,
+		"getName",		&service::getName,
+		"getID",		&service::getID,
+		"setType",		&service::setType,
+		"setSubType",		&service::setSubType,
+		"setUniqKey",		&service::setUniqKey,
+		"setHost",		&service::setHost,
+		"setHandler",		&service::setHandler,
+		"addLogMonitor",	&service::addLogMonitor,
+		"updateBasePaths",	&service::updateBasePaths,
+		"setName",		&service::setName
+	);*/
+	
+	state["find"]();
 }
 
 }

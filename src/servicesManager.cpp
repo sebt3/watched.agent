@@ -24,7 +24,7 @@ namespace watcheD {
  */
 std::map<std::string, detector_maker_t* > detectorFactory;
 std::map<std::string, enhancer_maker_t* > enhancerFactory;
-std::map<std::string, handler_maker_t*  >  handlerFactory;
+std::map<std::string, std::pair<handler_maker_t*,std::string> >  handlerFactory;
 std::map<std::string, service_maker_t*  >  serviceFactory;
 std::map<std::string, std::pair<parser_maker_t*,std::string> >		  parserFactory;
 std::map<std::string, std::pair<service_collector_maker_t*,std::string> > serviceCollectorFactory;
@@ -126,16 +126,16 @@ void servicesManager::init() {
 							return std::make_shared<LuaParser>(p_logname, p_cfg, p_luafile);
 						}, full_file_name);
 				}
-				if (q->isType("enhancer")) {
+				if (q->isType("enhancer"))
 					enhancers.push_back(std::make_shared<LuaServiceEnhancer>(shared_from_this(), full_file_name));
+				if (q->isType("handler") && (handlerFactory.find(name) == handlerFactory.end())) {
+					handlerFactory[name] = std::make_pair(
+						[](std::shared_ptr<service> p_s, const std::string p_luafile) -> std::shared_ptr<serviceHandler> {
+							return std::make_shared<LuaServiceHandler>( p_s, p_luafile);
+						}, full_file_name);
 				}
-				if (q->isType("handler")) {
-					// TODO: store the information so it could be reused later
-				}
-				if (q->isType("detector")) {
-					// TODO: Write that LuaDetector class
-					// detectors.push_back(std::make_shared<LuaDetector>(shared_from_this(), server, full_file_name));
-				}
+				if (q->isType("detector"))
+					detectors.push_back(std::make_shared<LuaDetector>(shared_from_this(), server, full_file_name));
 			}
 		}
 		closedir(dir);

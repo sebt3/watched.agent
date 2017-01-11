@@ -129,7 +129,8 @@ public:
 	void 		addMainProcess(std::shared_ptr<process> p_p);
 	void		updateMainProcess(std::shared_ptr<process> p_p);
 	void 		addSubProcess(std::shared_ptr<process> p_p);
-	void		setHandler(std::shared_ptr<serviceHandler> p_h) { handler = p_h; }
+	void		setHandlerObj(std::shared_ptr<serviceHandler> p_h) { handler = p_h; }
+	void		setHandler(const std::string p_name);
 	void		setType(std::string p_type) { type=p_type; }
 	void		setSubType(std::string p_type) { subType=p_type; }
 	void		setHost(std::string p_host) { host=p_host; }
@@ -253,15 +254,15 @@ private:
  */
 
 typedef std::shared_ptr<service>         service_maker_t(const service& p_src);
-typedef std::shared_ptr<serviceHandler>  handler_maker_t(std::shared_ptr<service> p_s);
+typedef std::shared_ptr<serviceHandler>  handler_maker_t(std::shared_ptr<service> p_s, const std::string p_luafile);
 typedef std::shared_ptr<serviceDetector> detector_maker_t(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server);
 typedef std::shared_ptr<serviceEnhancer> enhancer_maker_t(std::shared_ptr<servicesManager> p_sm);
 typedef std::shared_ptr<logParser> 	 parser_maker_t(const std::string p_logname, Json::Value* p_cfg, const std::string p_luafile);
 typedef std::shared_ptr<Collector> 	 service_collector_maker_t(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string p_filename);
 extern std::map<std::string, service_maker_t* >  serviceFactory;
-extern std::map<std::string, handler_maker_t* >  handlerFactory;
 extern std::map<std::string, detector_maker_t* > detectorFactory;
 extern std::map<std::string, enhancer_maker_t* > enhancerFactory;
+extern std::map<std::string, std::pair<handler_maker_t*,std::string> >  handlerFactory;
 extern std::map<std::string, std::pair<parser_maker_t*,std::string> > parserFactory;
 extern std::map<std::string, std::pair<service_collector_maker_t*,std::string> > serviceCollectorFactory;
 }
@@ -302,12 +303,12 @@ proxyService_##id ps_##id;
 
 #define MAKE_PLUGIN_HANDLER(className,id)					\
 extern "C" {									\
-std::shared_ptr<serviceHandler> makeHandler_##id(std::shared_ptr<service> p_s) {\
+std::shared_ptr<serviceHandler> makeHandler_##id(std::shared_ptr<service> p_s, const std::string p_luafile) {\
    return std::make_shared<className>(p_s);					\
 }										\
 }										\
 class proxyHandler_##id { public:						\
-   proxyHandler_##id(){ handlerFactory[#id] = makeHandler_##id; }		\
+   proxyHandler_##id(){ handlerFactory[#id] = std::make_pair(makeHandler_##id,""); }		\
 };										\
 proxyHandler_##id ph_##id;
 
