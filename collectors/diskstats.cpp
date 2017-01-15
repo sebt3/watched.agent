@@ -6,8 +6,6 @@
 #include <algorithm>
 #include <iterator>
 
-
-using namespace std;
 using namespace watcheD;
 
 class diskStatsRess : public tickRessource {
@@ -24,7 +22,7 @@ public:
 		addProperty("iotime",  "IO time ms/s", "number");
 		addProperty("iowtime", "Weighted IO time ms/s", "number");
 	}
-	void setRaw(vector<string> raw) {
+	void setRaw(std::vector<std::string> raw) {
 		setTickValue("rcount",	atoi(raw[3].c_str()));
 		setTickValue("rmerge",	atoi(raw[4].c_str()));
 		setTickValue("rsector",	atoi(raw[5].c_str()));
@@ -45,13 +43,13 @@ public:
 	}
 
 	void collect() {
-		string		line;
-		string		values;
-		ifstream	infile("/proc/diskstats");
+		std::string	line;
+		std::string	values;
+		std::ifstream	infile("/proc/diskstats");
 		std::shared_ptr<diskStatsRess>	res;
 		while(infile.good() && getline(infile, line)) {
-			istringstream iss(line);
-			vector<string> tokens{istream_iterator<string>{iss}, istream_iterator<string>{}};
+			std::istringstream iss(line);
+			std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
 			if(tokens[2].substr(0,3) == "dm-") continue;
 			if (ressources.find(tokens[2]) == ressources.end()) {
 				res = std::make_shared<diskStatsRess>((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt());

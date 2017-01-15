@@ -6,3 +6,5 @@ debian/debhelper-build-stamp
 debian/files
 debian/watched.agent.debhelper.log
 debian/watched.agent.substvars
+.kdev4/*
+*.kdev4

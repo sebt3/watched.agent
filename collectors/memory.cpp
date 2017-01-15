@@ -3,15 +3,14 @@
 #include <iostream>
 #include <chrono>
 
-using namespace std;
 using namespace watcheD;
 
 class MemoryCollector : public Collector {
 public:
 	MemoryCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("memory", p_srv, p_cfg, 150, 10) {
-		string		line;
-		string		id;
-		ifstream	infile("/proc/meminfo");
+		std::string	line;
+		std::string	id;
+		std::ifstream	infile("/proc/meminfo");
 		if (infile.good()) {
 			infile.close();
 			addRessource("swap", "Swap usage", "swap_usage");
@@ -31,12 +30,12 @@ public:
 	}
 
 	void collect() {
-		string		line;
+		std::string	line;
 		uint32_t	value;
-		string		id = "";
-		ifstream	infile("/proc/meminfo");
-		int		start=0;
-		bool		found=false;
+		std::string	id = "";
+		std::ifstream	infile("/proc/meminfo");
+		int		start = 0;
+		bool		found = false;
 		uint32_t	MemTotal = 0;
 		uint32_t	MemFree = 0;
 		uint32_t	Slab = 0;
@@ -44,7 +43,7 @@ public:
 		uint32_t	Cached = 0;
 		uint32_t	SwapTotal = 0;
 		uint32_t	SwapFree = 0;
-		bool ok= false;
+		bool 		ok = false;
 
 		while(infile.good() && getline(infile, line)) {
 			id = line.substr(0, line.find(":"));
@@ -63,7 +62,7 @@ public:
 			else if (id == "Slab")		Slab = value;
 			else if (id == "SwapTotal")	SwapTotal = value;
 			else if (id == "SwapFree")	SwapFree = value;
-			ok=true;
+			ok = true;
 		}
 		if (ok) {
 			infile.close();

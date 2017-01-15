@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 9)
 
 Package: watched.agent
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: libboost-atomic1.62.0, libboost-chrono1.62.0, libboost-date-time1.62.0, libboost-filesystem1.62.0, libboost-system1.62.0, libboost-thread1.62.0, libc6 (>= 2.14), libgcc1 (>= 1:3.0), liblua5.2-0, libssl1.1 (>= 1.1.0), libstdc++6 (>= 6), libsystemd0 (>= 222)
 Description: watch over your system
  Collect performance metrics
  Monitor key system ressources and services

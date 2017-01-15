@@ -11,18 +11,15 @@
 #include <mntent.h>
 #include <sys/statvfs.h>
 
-
-
-using namespace std;
 using namespace watcheD;
 
-string url_encode(const string &value) {
-    ostringstream escaped;
+std::string url_encode(const std::string &value) {
+    std::ostringstream escaped;
     escaped.fill('0');
-    escaped << hex;
+    escaped << std::hex;
 
-    for (string::const_iterator i = value.begin(), n = value.end(); i != n; ++i) {
-        string::value_type c = (*i);
+    for (std::string::const_iterator i = value.begin(), n = value.end(); i != n; ++i) {
+        std::string::value_type c = (*i);
 
         // Keep alphanumeric and other accepted characters intact
         if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
@@ -31,9 +28,9 @@ string url_encode(const string &value) {
         }
 
         // Any other characters are percent-encoded
-        escaped << uppercase;
-        escaped << '%' << setw(2) << int((unsigned char) c);
-        escaped << nouppercase;
+        escaped << std::uppercase;
+        escaped << '%' << std::setw(2) << int((unsigned char) c);
+        escaped << std::nouppercase;
     }
 
     return escaped.str();
@@ -68,11 +65,11 @@ public:
 		struct mntent *mnt_info;
 		struct statvfs stats;
 		
-		string id;
+		std::string id;
 		std::shared_ptr<diskUsageRess> res;
 
 		if ( ( fh = setmntent( "/etc/mtab", "r" ) ) == NULL ) {
-			cerr << "Cannot open \'/etc/mtab\'!\n";
+			std::cerr << "Cannot open \'/etc/mtab\'!\n";
 			return;
 		}
 

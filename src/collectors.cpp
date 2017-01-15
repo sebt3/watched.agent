@@ -326,9 +326,8 @@ void Collector::getIndexHtml(std::stringstream& stream ){
 std::map<std::string, collector_maker_t *> collectorFactory;
 
 void CollectorsManager::getIndexHtml(std::stringstream& stream ) {
-	for(std::map<std::string, std::shared_ptr<Collector> >::iterator i = collectors.begin();i != collectors.end();i++) {
+	for(std::map<std::string, std::shared_ptr<Collector> >::iterator i = collectors.begin();i != collectors.end();i++)
 		i->second->getIndexHtml(stream);
-	} 
 }
 void CollectorsManager::getJson(Json::Value* p_defs) {
 	int cnt = 0;
@@ -398,7 +397,7 @@ CollectorsManager::CollectorsManager(std::shared_ptr<HttpServer> p_server, std::
 				continue;
 
 
-			if (file_name.substr(file_name.rfind(".")) == ".lua") {
+			if (file_name.substr(file_name.rfind(".")) == ".lua" && collectors.find(name)==collectors.end()) {
 				collectors[name] = std::make_shared<LuaCollector>(server, cfg->getCollector(name), full_file_name);
 			}
 		}

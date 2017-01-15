@@ -6,8 +6,6 @@
 #include <algorithm>
 #include <iterator>
 
-
-using namespace std;
 using namespace watcheD;
 
 class cpuTicks : public Ressource {
@@ -20,9 +18,9 @@ public:
 		addProperty("irq",    "Sevicing interupts(%)", "number");
 		addProperty("softirq","Sevicing softirq(%)", "number");
 	}
-	void setRaw(vector<string> raw) {
+	void setRaw(std::vector<std::string> raw) {
 		uint sum;
-		string id;
+		std::string id;
 		
 		live["user"]	=atoi(raw[1].c_str());
 		live["nice"]	=atoi(raw[2].c_str());
@@ -54,9 +52,9 @@ private:
 class CpuUseCollector : public Collector {
 public:
 	CpuUseCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("cpuuse", p_srv, p_cfg) {
-		string		line;
-		string		id;
-		ifstream	infile("/proc/stat");
+		std::string	line;
+		std::string	id;
+		std::ifstream	infile("/proc/stat");
 		while(infile.good() && getline(infile, line)) {
 			if (line.substr(0, 3) == "cpu") {
 				if (line.substr(0, 4) == "cpu ")	id = "all";
@@ -80,16 +78,16 @@ public:
 	}
 
 	void collect() {
-		string		line;
-		string		values;
-		string		id = "";
-		ifstream	infile("/proc/stat");
+		std::string	line;
+		std::string	values;
+		std::string	id = "";
+		std::ifstream	infile("/proc/stat");
 		std::shared_ptr<cpuTicks>	res;
 		std::shared_ptr<tickRessource>	tres;
 		while(infile.good() && getline(infile, line)) {
 			if (line.substr(0, 3) == "cpu") {
-				istringstream iss(line);
-				vector<string> tokens{istream_iterator<string>{iss}, istream_iterator<string>{}};
+				std::istringstream iss(line);
+				std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
 				if (line.substr(0, 4) == "cpu ")	id = "all";
 				else					id = line.substr(3, line.find(" ")-3);
 				ressources[id]->nextValue();

@@ -134,6 +134,10 @@ uint32_t process::getPPID() {
 	return 0;
 }
 
+void process::clearSockets() {
+	sockets.clear();
+}
+
 void process::setSockets() {
 	// get all its opened sockets
 	DIR *dir;
@@ -145,6 +149,7 @@ void process::setSockets() {
 	path << "/proc/" << pid << "/fd/";
 	do {
 	if ((dir = opendir (path.str().c_str())) == NULL) break;
+	clearSockets();
 	while ((ent = readdir (dir)) != NULL) {
 		// looping throw all /proc/[pid]/fd/[fd]
 		if (ent->d_name[0] == '.') continue;
@@ -156,7 +161,9 @@ void process::setSockets() {
 		// check if it's a socket
 		if (link.compare(0, soc.length(), soc) !=0)
 			continue;
-		sockets.push_back(atoi(link.substr(soc.length()).c_str()));
+		uint32_t socket_tmp = atoi(link.substr(soc.length()).c_str());
+		if(haveSocket(socket_tmp)) continue;
+		sockets.push_back(socket_tmp);
 	}
 	}while(false);
 	closedir (dir);
@@ -799,7 +806,7 @@ void	service::addLogMonitor(std::string p_logmonName, std::string p_filematch) {
 	}
 	parsers[p_filematch] = parserFactory[p_logmonName].first(logfile, getParserCfg(p_logmonName), parserFactory[p_logmonName].second);
 	parsers[p_filematch]->startThread();
-	server->logNotice("service::addLogMonitor", "added "+p_logmonName+" log("+logfile+") parser to "+name+" service");
+	server->logInfo("service::addLogMonitor", "added "+p_logmonName+" log("+logfile+") parser to "+name+" service");
 }
 
 void	service::updateFrom(std::shared_ptr<service> src) {

@@ -6,8 +6,6 @@
 #include <algorithm>
 #include <iterator>
 
-
-using namespace std;
 using namespace watcheD;
 
 class netDevRess : public tickRessource {
@@ -23,7 +21,7 @@ public:
 		addProperty("terrs",    "Errors/s (transmit)", "number");
 		addProperty("tdrop",    "Drop/s (transmit)", "number");
 	}
-	void setRaw(vector<string> raw) {
+	void setRaw(std::vector<std::string> raw) {
 		setTickValue("rbytes",	atoi(raw[0].c_str()));
 		setTickValue("rpackets",atoi(raw[1].c_str()));
 		setTickValue("rerrs",	atoi(raw[2].c_str()));
@@ -43,23 +41,23 @@ public:
 	}
 
 	void collect() {
-		string		line;
-		string		values;
-		string		id = "";
-		ifstream	infile("/proc/net/dev");
+		std::string	line;
+		std::string	values;
+		std::string	id = "";
+		std::ifstream	infile("/proc/net/dev");
 		std::shared_ptr<netDevRess>	res;
 		while(infile.good() && getline(infile, line)) {
 			if (line.find(":") >= line.size()) continue;
 			int endid = line.find(":");
 			int start = line.rfind(" ",endid)+1;
 			id = line.substr(start,endid-start);
-			istringstream iss(line.substr(endid+1, line.length()));
-			vector<string> tokens{istream_iterator<string>{iss}, istream_iterator<string>{}};
+			std::istringstream iss(line.substr(endid+1, line.length()));
+			std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
 			if (ressources.find(id) == ressources.end()) {
 				res = std::make_shared<netDevRess>((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt());;
 				ressources[id]	= res;
 				desc[id]	= "Network interface "+id+" usage";
-			}else
+			} else
 				res = reinterpret_cast<std::shared_ptr<netDevRess>&>(ressources[id]);
 			ressources[id]->nextValue();
 			res->setRaw(tokens);

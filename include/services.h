@@ -49,6 +49,7 @@ public:
 	process(uint32_t p_pid);
 	process(std::string p_fullpath);
 	void 		setSockets();
+	void 		clearSockets();
 	bool 		haveSocket(uint32_t p_socket_id);
 	bool 		getStatus();
 	uint32_t	getPID() { return pid; }

@@ -431,8 +431,9 @@ void servicesManager::doGetRootPage(response_ptr response, request_ptr request) 
         stream << server->getHead("Home");
 	stream << "<div class=\"row\"><div class=\"col-md-3\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Services</h3></div><div class=\"box-body\">\n";
 
-	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++)
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
 		(*i)->getIndexHtml(stream);
+	}
 
 	stream << "</div></div></div>\n";
 
