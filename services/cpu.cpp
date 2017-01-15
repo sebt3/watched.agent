@@ -71,7 +71,7 @@ public:
 			infile.close();
 
 			// collect cpu used data
-			std::ifstream	statfile("/proc/"+std::to_string(*i)+"/sched");
+			std::ifstream	statfile("/proc/"+std::to_string(*i)+"/stat");
 			if (!statfile.good()) continue;
 			while(std::getline(statfile, line)) { // there's should be only one line but...
 				std::istringstream iss(line);
