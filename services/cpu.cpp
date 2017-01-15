@@ -20,7 +20,7 @@ public:
 		ressources["stat"]->addProperty("cuser",	"user % cumulated",	"number");
 		ressources["stat"]->addProperty("csystem",	"system % cumulated",	"number");
 		addGetMetricRoute();
-		morrisType="Area";morrisOpts="  ";prev_total_time=0;
+		prev_total_time=0;
 	}
 
 	void collect() {
@@ -73,27 +73,27 @@ public:
 			// collect cpu used data
 			std::ifstream	statfile("/proc/"+std::to_string(*i)+"/stat");
 			if (!statfile.good()) continue;
-			while(std::getline(statfile, line)) { // there's should be only one line but...
+			if(std::getline(statfile, line)) { // there's should be only one line but...
 				std::istringstream iss(line);
 				std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
 
 				if (tokens.size() < 17) continue;
-				uint32_t v = atoi(tokens[14].c_str());
+				uint32_t v = atoi(tokens[13].c_str());
 				if (users.find(*i)!=users.end() && users[*i]<v)
 					res_users += v - users[*i];
 				users[*i] = v;
-				v = atoi(tokens[15].c_str());
+				v = atoi(tokens[14].c_str());
 				if (sys.find(*i)!=sys.end() && sys[*i]<v)
 					res_sys += v - sys[*i];
-				users[*i] = v;
-				v = atoi(tokens[16].c_str());
+				sys[*i] = v;
+				v = atoi(tokens[15].c_str());
 				if (cusers.find(*i)!=cusers.end() && cusers[*i]<v)
 					res_cusers += v - cusers[*i];
-				users[*i] = v;
-				v = atoi(tokens[17].c_str());
+				cusers[*i] = v;
+				v = atoi(tokens[16].c_str());
 				if (csys.find(*i)!=csys.end() && csys[*i]<v)
 					res_csys += v - csys[*i];
-				users[*i] = v;
+				csys[*i] = v;
 			}
 			statfile.close();
 			process++;
@@ -103,12 +103,13 @@ public:
 			ressources["shed"]->setProperty("exec_runtime",	sum);
 			ressources["shed"]->setProperty("process",	process);
 			ressources["shed"]->setProperty("thread",	thread);
+			double p = 100*cpu_count;p = p/(total_time-prev_total_time);
 			ressources["stat"]->nextValue();
-			ressources["stat"]->setProperty("user",		res_users*100*cpu_count/(total_time-prev_total_time));
-			ressources["stat"]->setProperty("system",	res_sys*100*cpu_count/(total_time-prev_total_time));
-			ressources["stat"]->setProperty("pct",		(res_sys+res_users)*100*cpu_count/(total_time-prev_total_time));
-			ressources["stat"]->setProperty("cuser",	res_cusers*100*cpu_count/(total_time-prev_total_time));
-			ressources["stat"]->setProperty("csystem",	res_csys*100*cpu_count/(total_time-prev_total_time));
+			ressources["stat"]->setProperty("user",		res_users*p);
+			ressources["stat"]->setProperty("system",	res_sys*p);
+			ressources["stat"]->setProperty("pct",		(res_sys+res_users)*p);
+			ressources["stat"]->setProperty("cuser",	res_cusers*p);
+			ressources["stat"]->setProperty("csystem",	res_csys*p);
 		}
 		prev_total_time = total_time;
 	}
