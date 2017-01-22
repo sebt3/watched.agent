@@ -4,12 +4,12 @@
 #include <chrono>
 
 using namespace watcheD;
+namespace collectors {
 
 class CpuLoadCollector : public Collector {
 public:
 
 	CpuLoadCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("cpuload", p_srv, p_cfg, 150, 10) {
-		std::string	line;
 		addRessource("avg", "Load average", "loadaverage");
 		ressources["avg"]->addProperty("avg1",  "Load average (1mn)", "number");
 		ressources["avg"]->addProperty("avg5",  "Load average (5mn)", "number");
@@ -34,3 +34,5 @@ public:
 };
 
 MAKE_PLUGIN_COLLECTOR(CpuLoadCollector, cpuload)
+
+}

@@ -8,7 +8,7 @@
 
 
 namespace watcheD {
-
+std::string watched_log_file;
 log::log(Json::Value* p_cfg) : cfg(p_cfg) {
 	bool found = false;
 	std::string lvl;
@@ -16,6 +16,7 @@ log::log(Json::Value* p_cfg) : cfg(p_cfg) {
 		(*cfg)["file"] = WATCHED_LOG_FILE;
 		(*cfg)["file"].setComment(std::string("/*\t\tthe log file*/"), Json::commentAfterOnSameLine);
 	}
+	watched_log_file = (*cfg)["file"].asString();
 	if(! cfg->isMember("level") ) {
 		(*cfg)["level"] = "NOTICE";
 		(*cfg)["level"].setComment(std::string("/*\t\tlevel to log at (NONE,ERROR,WARN,NOTICE,INFO,DEBUG,ALL)*/"), Json::commentAfterOnSameLine);
@@ -42,13 +43,19 @@ void log::write(uint16_t p_lvl, const std::string p_src, std::string p_message) 
 	timeinfo = localtime(&rawtime);
 	strftime(buffer,80,"%d-%m-%Y %H:%M:%S",timeinfo);
 
-	std::ofstream outfile;
-	std::unique_lock<std::mutex> locker(mutex); 
-	outfile.open((*cfg)["file"].asString(), std::ios_base::app);
-	if (outfile.is_open())
-		outfile << "[ " << buffer << " - " << std::setw(6) << levels[p_lvl] << " ] "<< std::setw(30) << p_src << " - " << p_message << std::endl;
-	else
-		std::cout << "[ " << buffer << " - " << std::setw(6) << levels[p_lvl] << " ] "<< std::setw(30) << p_src << " - " << p_message << std::endl;
+	try {
+		std::ofstream outfile;
+		std::unique_lock<std::mutex> locker(mutex); 
+		outfile.open((*cfg)["file"].asString(), std::ios_base::app);
+		if (outfile.is_open())
+			outfile << "[ " << buffer << " | " << std::setw(6) << levels[p_lvl] << " ] "<< std::setw(30) << p_src << " - " << p_message << std::endl;
+		else
+			std::cerr << "[ " << buffer << " | " << std::setw(6) << levels[p_lvl] << " ] "<< std::setw(30) << p_src << " - " << p_message << std::endl;
+		outfile.close();
+	} catch(std::exception &e) {
+		std::cerr << "[ " << buffer << " | " << std::setw(6) << levels[p_lvl] << " ] "<< std::setw(30) << p_src << " - " << p_message << std::endl;
+	}
+
 }
 
 void log::write(std::string p_lvl, const std::string p_src, std::string p_message) {

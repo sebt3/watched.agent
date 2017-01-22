@@ -4,6 +4,7 @@
 #include <chrono>
 
 using namespace watcheD;
+namespace collectors {
 
 class Uptime : public Collector {
 public:
@@ -27,3 +28,5 @@ public:
 };
 
 MAKE_PLUGIN_COLLECTOR(Uptime, uptime)
+
+}

@@ -7,6 +7,7 @@
 #include <iterator>
 
 using namespace watcheD;
+namespace collectors {
 
 class cpuTicks : public Ressource {
 public:
@@ -111,3 +112,5 @@ public:
 
 
 MAKE_PLUGIN_COLLECTOR(CpuUseCollector, cpuuse)
+
+}

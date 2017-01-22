@@ -86,6 +86,11 @@ void servicesManager::init() {
 		}
 		closedir(dir);
 	} else	server->logWarning("servicesManager::", directory+" doesnt exist. No services plugins will be used");
+	
+	serviceCollectorFactory["self"] = std::make_pair(
+		[](std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string p_fname) -> std::shared_ptr<Collector> {
+			return std::make_shared<SelfCollector>(p_srv, p_cfg, p_s);
+		},"");
 
 	// Instanciate the detector classes
 	for(std::map<std::string, detector_maker_t* >::iterator factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
@@ -172,11 +177,21 @@ void servicesManager::startThreads() {
 		Json::Value*		servCfg	  = cfg->getServices();
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		do {
-			find();
+			try {
+				find();
+			} catch(std::exception &e) {
+				server->logWarning("servicesManager::thread", e.what());
+			}
+
 		} while (active && timer.wait_for(std::chrono::seconds((*servCfg)["find_frequency"].asInt())) && active);
 		
 	});
 
+}
+
+void servicesManager::updateService(std::shared_ptr<service> p_serv) {
+	Json::Value*		servCfg	  = cfg->getServices();
+	p_serv->saveConfigTemplate((*servCfg)["config_dir"].asString());
 }
 
 void servicesManager::addService(std::shared_ptr<service> p_serv) {
@@ -382,7 +397,7 @@ void	servicesManager::doGetCollectorHistory(response_ptr response, request_ptr r
 	Json::Value res(Json::objectValue);
 	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
 		if ( *(*i) == id) {
-			// TODO look for the collector and get its response here
+			// look for the collector and get its response here
 			std::shared_ptr<Collector> c = (*i)->getCollector(cid);
 			if (c == nullptr) {
 				res["error"] = "No collector matching '"+cid+"' for service '"+id+"' found";
@@ -582,6 +597,7 @@ void socketDetector::find(void) {
 				serv->setSocket(*i);
 				coun2++;
 			}
+			mgr->updateService(serv);
 			continue;
 		}
 		std::shared_ptr<process> p = std::make_shared<process>(pid);

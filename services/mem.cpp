@@ -5,6 +5,7 @@
 
 // This is exactly the same as in the mem.lua file. This is here for memory usage difference only
 using namespace watcheD;
+namespace services {
 
 class ServMemCollector : public Collector {
 public:
@@ -46,3 +47,6 @@ public:
 };
 
 MAKE_PLUGIN_SERVICE_COLLECTOR(ServMemCollector, mem)
+
+
+}

@@ -22,6 +22,14 @@ void setResponseJson(response_ptr response, std::string content) {
 /*********************************
  * Ressource
  */
+Ressource::Ressource(uint p_size, std::string p_typeName): typeName(p_typeName), size(p_size) {
+	globalCounters["ressource"].add++;
+}
+
+Ressource::~Ressource(){
+	globalCounters["ressource"].del++;
+}
+
 void Ressource::nextValue() {
 	Json::Value data(Json::objectValue);
 	std::chrono::duration<double, std::milli> fp_ms = std::chrono::system_clock::now().time_since_epoch();
@@ -29,9 +37,12 @@ void Ressource::nextValue() {
 		v.insert(v.begin(), data);
 	else
 		v.insert(v.begin(), v[0]);
+	globalCounters["values_count"].add++;
 	v[0]["timestamp"] = fp_ms.count();
-	if (v.size()>size)
+	if (v.size()>size) {
+		globalCounters["values_count"].del+=v.size()-size;
 		v.resize(size);
+	}
 }
 
 std::string  Ressource::getHistory(double since) {
@@ -78,10 +89,30 @@ void Ressource::getDefinition(Json::Value* p_defs) {
 
 
 /*********************************
+ * pidRessource
+ */
+void pidRessource::nextValue() {
+	Ressource::nextValue();
+	for(std::map<std::string,std::map<uint64_t,uint64_t>>::iterator i=values.begin();i!=values.end();i++)
+		v[0][i->first] = 0.0;
+}
+
+void pidRessource::setPidValue(std::string p_name, uint64_t p_pid, uint64_t p_value) {
+	std::map<std::string,std::map<uint64_t,uint64_t>>::iterator pcont=values.find(p_name);
+	if (pcont != values.end()) {
+		std::map<uint64_t,uint64_t>::iterator pval=values[p_name].find(p_pid);
+		if (pval != values[p_name].end() && values[p_name][p_pid]<p_value)
+			v[0][p_name] = v[0][p_name].asDouble()+factor*(p_value-values[p_name][p_pid]);
+	}
+	values[p_name][p_pid]=p_value;
+}
+
+/*********************************
  * Collector
  */
 
 Collector::Collector(std::string p_name, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg, uint p_history, uint p_freq_pool, std::shared_ptr<service> p_serv): cfg(p_cfg), morrisType("Line"), morrisOpts("behaveLikeLine:true,"), name(p_name), basePath("/system/"), haveService(false), active(false),  server(p_server) {
+	globalCounters["collector"].add++;
 	if(! cfg->isMember("history") && p_history>0) {
 		(*cfg)["history"] = p_history;
 		(*cfg)["history"].setComment(std::string("/*\t\tNumber of elements to keep*/"), Json::commentAfterOnSameLine);
@@ -100,6 +131,7 @@ Collector::Collector(std::string p_name, std::shared_ptr<HttpServer> p_server, J
 
 Collector::~Collector() {
 	std::unique_lock<std::mutex> locker(lock);
+	globalCounters["collector"].del++;
 	if (active) {
 		active=false;
 		timer.kill();
@@ -122,12 +154,14 @@ void Collector::startThread() {
 			int sec = ((*cfg)["poll-frequency"]).asInt();
 			while(active) {
 				// jsoncpp isnt thread safe
-				{
+				try {
 					std::unique_lock<std::mutex> locker(lock);
 					if (active) {// if we've been locked by the destructor...
 						collect();
 						server->logInfo("Collector::thread", basePath+name+" updated");
 					}
+				} catch(std::exception &e) {
+					server->logWarning("Collector::thread", basePath+name+" failed  to collect: "+e.what());
 				}
 				timer.wait_for(std::chrono::seconds(sec));
 			}
@@ -411,7 +445,33 @@ void CollectorsManager::startThreads() {
 }
 
 CollectorsManager::~CollectorsManager() {
-	// TODO free the ressources here
+}
+
+
+/*********************************
+ * SelfCollector
+ */
+std::map<std::string, counter> globalCounters;
+SelfCollector::SelfCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_serv) : Collector("self", p_srv, p_cfg, 150, 10, p_serv) {
+	ressources["changes"]	= std::make_shared<tickRessource>((*cfg)["history"].asUInt(), (*cfg)["poll-frequency"].asUInt(), "watched_agent_count");
+	desc["changes"]		= "Internal changes";
+	addRessource("values", "Current objects count", "watched_agent_values");
+	for(std::map<std::string, counter>::iterator i=globalCounters.begin();i!=globalCounters.end();i++) {
+		ressources["values"]->addProperty(i->first, i->first+" current count", "number");
+		ressources["changes"]->addProperty(i->first+"_del", i->first+" deleted", "number");
+		ressources["changes"]->addProperty(i->first+"_add", i->first+" added", "number");
+	}
+}
+
+void SelfCollector::collect() {
+	std::shared_ptr<tickRessource>	tres = reinterpret_cast<std::shared_ptr<tickRessource>&>(ressources["changes"]);
+	ressources["values"]->nextValue();
+	tres->nextValue();
+	for(std::map<std::string, counter>::iterator i=globalCounters.begin();i!=globalCounters.end();i++) {
+		ressources["values"]->setProperty(i->first, i->second.add-i->second.del);
+		tres->setTickValue(i->first+"_del", i->second.del);
+		tres->setTickValue(i->first+"_add", i->second.add);
+	}
 }
 
 }

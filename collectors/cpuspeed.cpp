@@ -4,6 +4,7 @@
 #include <chrono>
 
 using namespace watcheD;
+namespace collectors {
 
 class CpuSpeedCollector : public Collector {
 public:
@@ -43,3 +44,5 @@ public:
 };
 
 MAKE_PLUGIN_COLLECTOR(CpuSpeedCollector, cpuspeed)
+
+}

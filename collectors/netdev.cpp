@@ -7,6 +7,7 @@
 #include <iterator>
 
 using namespace watcheD;
+namespace collectors {
 
 class netDevRess : public tickRessource {
 public:
@@ -69,3 +70,5 @@ public:
 
 
 MAKE_PLUGIN_COLLECTOR(NetDevCollector, netdev)
+
+}

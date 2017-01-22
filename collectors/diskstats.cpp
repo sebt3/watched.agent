@@ -7,6 +7,7 @@
 #include <iterator>
 
 using namespace watcheD;
+namespace collectors {
 
 class diskStatsRess : public tickRessource {
 public:
@@ -68,3 +69,5 @@ public:
 
 
 MAKE_PLUGIN_COLLECTOR(diskStatsCollector, diskstats)
+
+}

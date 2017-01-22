@@ -1,8 +1,9 @@
 #include "services.h"
 using namespace watcheD;
 
-// might use this version once libsystemd actually stop leaking memory
 #include <systemd/sd-bus.h>
+namespace services {
+
 static uint32_t getPID(sd_bus *bus, std::string path) {
 	const char *contents = NULL;
 	sd_bus_error error = SD_BUS_ERROR_NULL;
@@ -222,7 +223,7 @@ public:
 		std::string res = getStatus(bus, id);
 		//sd_bus_unref(bus);
 		if (res == "active") { // restarted not yet known
-			// TODO: update mainprocess
+			// update mainprocess
 			std::shared_ptr<service> s = serv.lock();
 			if(!s) return true;
 			uint32_t PID = getPID(bus, id);
@@ -391,3 +392,5 @@ MAKE_PLUGIN_SERVICE(printService, print)
 MAKE_PLUGIN_SERVICE(systemService, system)
 MAKE_PLUGIN_ENHANCER(systemEnhancer, system)
 */
+
+}

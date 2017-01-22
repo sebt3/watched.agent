@@ -158,7 +158,8 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 		http->config.address  = (*cfg)["host"].asString();
 		http->on_error = [this](request_ptr_h req, const boost::system::error_code& ec)  {
 			std::string err = ec.message();
-			logNotice("HttpServer::httpOnError", err);
+			if (err!="Operation canceled")
+				logNotice("HttpServer::httpOnError", err);
 		};
 
 		http->default_resource["GET"]=[this](std::shared_ptr<SWHttpServer::Response> response, std::shared_ptr<SWHttpServer::Request> request) {

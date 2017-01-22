@@ -4,6 +4,7 @@
 #include <chrono>
 
 using namespace watcheD;
+namespace services {
 
 // This is exactly the same as in the cpu.lua file. This is here for memory usage difference only
 class ServCpuCollector : public Collector {
@@ -123,3 +124,5 @@ private:
 };
 
 MAKE_PLUGIN_SERVICE_COLLECTOR(ServCpuCollector, cpu)
+
+}

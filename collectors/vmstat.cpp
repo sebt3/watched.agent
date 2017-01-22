@@ -8,6 +8,7 @@
 
 
 using namespace watcheD;
+namespace collectors {
 
 class vmStatCollector : public Collector {
 public:
@@ -62,3 +63,5 @@ public:
 
 
 MAKE_PLUGIN_COLLECTOR(vmStatCollector, vmstat)
+
+}

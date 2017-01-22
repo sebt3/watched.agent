@@ -5,6 +5,8 @@
 
 using namespace watcheD;
 
+namespace collectors {
+
 class MemoryCollector : public Collector {
 public:
 	MemoryCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg) : Collector("memory", p_srv, p_cfg, 150, 10) {
@@ -84,3 +86,5 @@ public:
 };
 
 MAKE_PLUGIN_COLLECTOR(MemoryCollector, memory)
+
+}

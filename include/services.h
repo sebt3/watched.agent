@@ -110,7 +110,7 @@ public:
 	service(std::shared_ptr<HttpServer> p_server);
 	service(std::shared_ptr<HttpServer> p_server, std::string p_file_path);
 	service(const service& p_src);
-	~service() { server->logNotice("service::~service","Deleting "+name+" service"); }
+	~service();
 	void		updateFrom(std::shared_ptr<service> src);
 
 	bool		operator==(const std::string rhs);
@@ -119,6 +119,7 @@ public:
 	bool		haveSocket(uint32_t p_socket_id);
 	bool		haveSocket(std::string p_source) const;
 	bool		havePID(uint32_t p_pid);
+	bool		isSelf();
 	bool		haveHandler() { return handler != NULL; }
 	bool		needSocketFrom(std::shared_ptr<service> p_service);
 	std::string	getType() { return type; }
@@ -225,6 +226,7 @@ public:
 	void	init();
 	void	find();
 	void	addService(std::shared_ptr<service> p_serv);
+	void	updateService(std::shared_ptr<service> p_serv);
 	void	handleSubProcess(std::shared_ptr<process> p_p);
 	bool	haveSocket(uint32_t p_socket_id);
 	bool	havePID(uint32_t p_pid);

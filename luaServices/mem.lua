@@ -21,6 +21,8 @@ function collect ()
 	local shared = 0
 	local swap   = 0
 	local key    = ""
+	local line   = ""
+	local val    = ""
 	this.getPIDList()
 	while (type(pids[i]) == "number")
 	do

@@ -44,7 +44,8 @@ private:
  */
 class Ressource {
 public:
-	Ressource(uint p_size, std::string p_typeName): typeName(p_typeName), size(p_size) { }
+	Ressource(uint p_size, std::string p_typeName);
+	~Ressource();
 	void nextValue();
 	bool haveProperty(std::string p_name) { return v[0].isMember(p_name); }
 	void setProperty(std::string p_name, Json::Value p_val) { v[0][p_name] = p_val;}
@@ -54,9 +55,9 @@ public:
 	std::string  getMorrisDesc();
 	void getDefinition(Json::Value* p_defs);
 	std::string  typeName;
-
-private:
+protected:
 	std::vector<Json::Value>	  v;
+private:
 	std::map<std::string,std::string> d;
 	std::map<std::string,std::string> t;
 	uint				  size;
@@ -77,6 +78,16 @@ private:
 	uint				freq;
 };
 
+class pidRessource : public Ressource {
+public:
+	pidRessource(uint p_size, double p_factor, std::string p_typeName) : Ressource(p_size, p_typeName), factor(p_factor) { }
+	void nextValue();
+	void setFactor(double p_factor) {factor = p_factor; }
+	void setPidValue(std::string p_name, uint64_t p_pid, uint64_t p_value);
+private:
+	std::map<std::string,std::map<uint64_t,uint64_t>>	values;
+	double				factor;
+};
 
 /*********************************
  * Collector
@@ -136,13 +147,11 @@ private:
 	std::mutex			lock;
 };
 
-
 /*********************************
  * Plugin management
  */
 typedef std::shared_ptr<Collector> collector_maker_t(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg);
 extern std::map<std::string, collector_maker_t* > collectorFactory;
-
 }
 
 #define associate(s,type,regex,method)				\

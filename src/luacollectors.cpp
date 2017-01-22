@@ -30,7 +30,7 @@ LuaCollector::LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg
 			);
 		}
 	}
-
+	globalCounters["LuaCollector"].add++;
 	state["declare"]();
 	addGetMetricRoute();
 }
@@ -38,6 +38,7 @@ LuaCollector::LuaCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg
 LuaCollector::~LuaCollector() {
 	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
 	have_state = false;
+	globalCounters["LuaCollector"].del++;
 }
 
 void LuaCollector::addRes(std::string p_name, std::string p_desc, std::string p_typeName)
@@ -82,11 +83,13 @@ LuaParser::LuaParser(const std::string p_logname, Json::Value* p_cfg, const std:
 	state(cmd.c_str());
 	if(! cfg->isMember("history")) (*cfg)["history"] = (int)state["cfg"]["history"];
 	if(! cfg->isMember("poll-frequency")) (*cfg)["poll-frequency"] = (int)state["cfg"]["poolfreq"];
+	globalCounters["LuaParser"].add++;
 }
 
 LuaParser::~LuaParser() {
 	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
 	have_state = false;
+	globalCounters["LuaParser"].del++;
 }
 
 logParser::levels	LuaParser::getLevel(std::string p_line) {
@@ -131,11 +134,13 @@ bool LuaSorter::isType(const std::string p_typename) {
 LuaServiceEnhancer::LuaServiceEnhancer(std::shared_ptr<servicesManager> p_sm, const std::string p_fname): serviceEnhancer(p_sm), have_state(true) {
 	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
 	state.Load(p_fname);
+	globalCounters["LuaEnhancer"].add++;
 }
 
 LuaServiceEnhancer::~LuaServiceEnhancer() {
 	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
 	have_state = false;
+	globalCounters["LuaEnhancer"].del++;
 }
 
 std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_serv) {
@@ -145,6 +150,7 @@ std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_
 	state["p_serv"].SetObj(*p_serv,
 		"addCollector",		&service::addCollector,
 		"havePID",		&service::havePID,
+		"isSelf",		&service::isSelf,
 		"getType",		&service::getType,
 		"getSubType",		&service::getSubType,
 		"getName",		&service::getName,
@@ -170,6 +176,13 @@ std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_
 LuaServiceHandler::LuaServiceHandler(std::shared_ptr<service> p_s, const std::string p_fname): serviceHandler(p_s),have_state(true) {
 	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
 	state.Load(p_fname);
+	globalCounters["LuaHandler"].add++;
+}
+
+LuaServiceHandler::~LuaServiceHandler() {
+	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
+	have_state = false;
+	globalCounters["LuaHandler"].del++;
 }
 
 bool	LuaServiceHandler::isBlackout() {

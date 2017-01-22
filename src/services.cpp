@@ -1,5 +1,7 @@
 #include "agent.h"
+#include "config.h"
 
+#include <unistd.h>
 #include <fstream>
 #include <iostream>
 #include <chrono>
@@ -271,6 +273,7 @@ logParser::logParser(std::string p_logfile, Json::Value* p_cfg, uint p_history, 
 		(*cfg)["enable"] = true;
 		(*cfg)["enable"].setComment(std::string("/*\t\tEnable this plugin ?*/"), Json::commentAfterOnSameLine);
 	}
+	globalCounters["logParser"].add++;
 }
 
 logParser::~logParser() {
@@ -279,12 +282,12 @@ logParser::~logParser() {
 		active=false;
 		timer.kill();
 	}
+	globalCounters["logParser"].del++;
 	active=false;
 	if (my_thread.joinable()) my_thread.join();
 }
 
 void		logParser::parseLog() {
-	
 	std::ifstream	infile(filename, std::ios::ate);
 	if (!infile.good()) return; // file not found
 	std::string	line;
@@ -337,10 +340,12 @@ void		logParser::startThread() {
 			int sec = ((*cfg)["poll-frequency"]).asInt();
 			while(active) {
 				// jsoncpp isnt thread safe
-				{
+				try {
 					std::unique_lock<std::mutex> locker(lock);
 					if (active)// if we've been locked by the destructor...
 						parseLog();
+				} catch (std::exception &e) {
+					std::cerr << "logParser::thread - " << e.what() << std::endl;
 				}
 				timer.wait_for(std::chrono::seconds(sec));
 			}
@@ -370,6 +375,7 @@ std::string	logParser::getHistory(double since) {
  */
 service::service(std::shared_ptr<HttpServer> p_server): name(""), host(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), server(p_server) {
 	setDefaultHost();
+	globalCounters["service"].add++;
 }
 
 service::service(std::shared_ptr<HttpServer> p_server, std::string p_file_path): name(""), host(""), type("unknown"), uniqName(""), cfg(Json::objectValue), handler(NULL), cfgFile(p_file_path), server(p_server) {
@@ -390,6 +396,7 @@ service::service(std::shared_ptr<HttpServer> p_server, std::string p_file_path):
 		for (const Json::Value& line : cfg["process"])
 			addMainProcess(std::make_shared<process>(line.asString()));
 	setDefaultHost();
+	globalCounters["service"].add++;
 }
 
 service::service(const service& p_src) {
@@ -412,6 +419,11 @@ service::service(const service& p_src) {
 			collectors[i->first] = i->second;
 	updateBasePaths();
 	setDefaultHost();
+	globalCounters["service"].add++;
+}
+
+service::~service() {
+	globalCounters["service"].del++;
 }
 
 void	service::addCollector(const std::string p_name) {
@@ -774,6 +786,7 @@ void	service::updateMainProcess(std::shared_ptr<process> p_p) {
 	addMainProcess(p_p);
 }
 
+extern std::string watched_log_file;
 void	service::addLogMonitor(std::string p_logmonName, std::string p_filematch) {
 	std::shared_ptr< std::vector<std::string> > logs;
 	bool found = false;
@@ -785,6 +798,10 @@ void	service::addLogMonitor(std::string p_logmonName, std::string p_filematch) {
 		return; // no factory matching this name
 	}
 
+	if (p_filematch == "watched.agent") {
+		logfile=watched_log_file;
+		found=true;
+	} else {
 	for(std::vector< std::shared_ptr<process> >::iterator j=mainProcess.begin();j!=mainProcess.end()&&!found;j++) {
 		logs = (*j)->getOpenLogs();
 		for(std::vector<std::string>::iterator i=logs->begin(); i!=logs->end();i++) {
@@ -795,7 +812,7 @@ void	service::addLogMonitor(std::string p_logmonName, std::string p_filematch) {
 			}
 		}
 		
-	}
+	} }
 	if (!found) {
 		struct stat buffer;
 		if (stat (p_filematch.c_str(), &buffer) != 0) {
@@ -841,6 +858,13 @@ void	service::updateFrom(std::shared_ptr<service> src) {
 		cfg["collectors"][j.key().asString()] = *j;
 	}
 
+}
+
+static pid_t agentPID = 0;
+bool	service::isSelf() {
+	if(agentPID == 0)
+		agentPID = ::getpid();
+	return havePID(agentPID);
 }
 
 }

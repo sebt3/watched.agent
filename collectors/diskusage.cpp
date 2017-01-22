@@ -12,6 +12,7 @@
 #include <sys/statvfs.h>
 
 using namespace watcheD;
+namespace collectors {
 
 std::string url_encode(const std::string &value) {
     std::ostringstream escaped;
@@ -96,3 +97,5 @@ public:
 
 
 MAKE_PLUGIN_COLLECTOR(diskUsageCollector, diskusage)
+
+}

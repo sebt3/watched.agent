@@ -51,3 +51,15 @@ Complete instructions [here](https://sebt3.github.io/watched/doc/install/#the-ag
   * pacemaker
   * and more
 - More than one listen adress
+
+## TODO
+- LogSource support (services.h:76)
+- Add support for controlGroup (services.h:100)
+- Add the ability to create service in LuaDetector (luacollectors.cpp:226)
+- Fix the lua collector memory growth (have c++ collector in the mean time)
+- SubProcess cleanup (services.cpp:668)
+- Improve service matching (services.cpp:770)
+- Improve service updating (services.cpp:853)
+- Add support for service dependencies (servicesManager.cpp:628)
+- add support for sigusr1 which reload configs et reopen log
+- More usage of pidRessource in plugins and lua too

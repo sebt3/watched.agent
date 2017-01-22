@@ -6,6 +6,7 @@
 extern const std::string SERVER_HEAD;
 extern const std::string APPS_NAME;
 extern const std::string APPS_DESC;
+
 namespace watcheD {
 
 void setResponse404(response_ptr response, std::string content);
@@ -133,6 +134,7 @@ private:
 class LuaServiceHandler: public serviceHandler {
 public:
 	LuaServiceHandler(std::shared_ptr<service> p_s, const std::string p_fname);
+	~LuaServiceHandler();
 	bool isBlackout();
 private:
 	sel::State state{true};
@@ -152,6 +154,7 @@ private:
 	bool		have_state;
 	std::mutex	lua;
 };
+
 /*********************************
  * SocketDetector
  */
@@ -161,9 +164,23 @@ public:
 	void find();
 };
 
+/*********************************
+ * SelfCollector
+ */
+struct counter {
+	uint32_t add;
+	uint32_t del;
+};
+extern std::map<std::string, watcheD::counter> globalCounters;
+class SelfCollector : public Collector {
+public:
 
+	SelfCollector(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_serv);
+	void collect();
+};
 
 }
+
 
 /*********************************
  * Access-Control-Allow-Origin for pistache

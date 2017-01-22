@@ -7,6 +7,7 @@ cfg["history"]  = 300
 function declare ()
 	local f = assert(io.open("/proc/cpuinfo", "r"))
 	local id
+	local line = ""
 	for line in f:lines() do
 		if (line:match("(%a+)") == "processor") then
 			id = line:match("(%d+)")
@@ -21,6 +22,7 @@ end
 function collect ()
 	local f = assert(io.open("/proc/cpuinfo", "r"))
 	local id
+	local line = ""
 	for line in f:lines() do
 		if (line:match("(%a+)") == "processor") then
 			id = line:match("(%d+)")
