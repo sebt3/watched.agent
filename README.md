@@ -53,6 +53,7 @@ Complete instructions [here](https://sebt3.github.io/watched/doc/install/#the-ag
 - More than one listen adress
 
 ## TODO
+- Remove service missing for more than 15mn
 - LogSource support (services.h:76)
 - Add support for controlGroup (services.h:100)
 - Add the ability to create service in LuaDetector (luacollectors.cpp:226)

@@ -257,8 +257,8 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
 
 	std::stringstream stream;
         stream << server->getHead(desc[id], sub);
-	stream << "<div class=\"row\"><div class=\"col-md-12\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Graphics</h3><div class=\"box-tools pull-right\"><button type=\"button\" class=\"btn btn-box-tool\" onclick=\"toggle();\"><i class=\"fa fa-square-o\" id=\"btn-refresh\"></i>refresh</button></div><div class=\"box-body\"><div class=\"chart\"><div id=\"" << name.c_str() << "-graph\"></div>\n</div></div></div></div></div>\n";
-        stream << server->getFoot("var timerId = 0;var enable = false;var timerLen = "+((*cfg)["poll-frequency"].asString())+"*1000;\nfunction start() { timerId = setInterval(function() { updateLiveGraph("+name+"Graph); }, timerLen); }\nfunction stop() { clearInterval(timerId); }\nfunction toggle() { if (enable) { stop();enable=false; $('#btn-refresh').removeClass('fa-check-square-o'); $('#btn-refresh').addClass('fa-square-o'); }else{ start();enable=true; $('#btn-refresh').removeClass('fa-square-o'); $('#btn-refresh').addClass('fa-check-square-o'); } }\nfunction updateLiveGraph("+name+"Graph) {\n  $.getJSON('"+basePath+name+"/"+id.c_str()+"/history', function(results) { "+name+"Graph.setData(results); });\n}\n"+name+"Graph = new Morris."+morrisType+"({element: '"+name+"-graph',  data: [], xkey: 'timestamp', hideHover: true,pointSize:0,fillOpacity:0.3,"+morrisOpts+ressources[id]->getMorrisDesc()+"});\nupdateLiveGraph("+name+"Graph);");
+	stream << "<div class=\"row\"><div class=\"col-md-12\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Graphics</h3></div><div class=\"box-body\"><div class=\"chart\"><div id=\"" << name.c_str() << "-graph\"></div>\n</div></div></div></div></div>\n";
+        stream << server->getFoot("watchedLive('"+name+"-graph','"+basePath+name+"/"+id.c_str()+"/history',"+((*cfg)["poll-frequency"].asString())+")");
         setResponseHtml(response, stream.str());
 }
 

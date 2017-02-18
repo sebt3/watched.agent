@@ -1,0 +1,16 @@
+.error-details {
+	margin-top:30px;
+}
+
+.error-details table th {
+	padding-right:20px;
+}
+
+.chart .lines .line {
+	fill: none;
+	stroke-width: 3px;
+}
+.chart .axis .domain {
+	fill: none;
+	stroke-width: 0px;
+}
