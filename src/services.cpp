@@ -626,6 +626,13 @@ std::shared_ptr<process>	service::getProcess(uint32_t p_pid) {
 		if ((*i)->getPID() == p_pid) return *i;
 	return nullptr;
 }
+std::shared_ptr<process>	service::getMainProcess() {
+	std::vector< std::shared_ptr<process> >::iterator i=mainProcess.begin();
+	if(i!=mainProcess.end())
+		return *i;
+	return nullptr;
+}
+
 
 void	service::getJsonStatus(Json::Value* ref) {
 	bool isBlackout = false;

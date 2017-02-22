@@ -4,7 +4,85 @@ using namespace watcheD;
 #include <systemd/sd-bus.h>
 namespace services {
 
-static uint32_t getPID(sd_bus *bus, std::string path) {
+#define MAKE_DBUS_READ(ETYPE, RTYPE, FNAME, IFACE, PROP)						\
+static ETYPE FNAME(sd_bus *bus, std::string path) {							\
+	const char *contents = NULL;									\
+	sd_bus_error error = SD_BUS_ERROR_NULL;								\
+	sd_bus_message *reply = NULL;									\
+	char type;											\
+	union {												\
+		uint8_t u8;										\
+		uint16_t u16;										\
+		int16_t s16;										\
+		uint32_t u32;										\
+		int32_t s32;										\
+		uint64_t u64;										\
+		int64_t s64;										\
+		double d64;										\
+		const char *string;									\
+		int i;											\
+	} basic;											\
+													\
+	int r = sd_bus_call_method(bus,									\
+		"org.freedesktop.systemd1",								\
+		path.c_str(),										\
+		"org.freedesktop.DBus.Properties", "Get",						\
+		&error, &reply, "ss", IFACE, PROP);							\
+	if (r < 0) {											\
+		if(0==1) std::cerr << "Failed to issue method call: " << error.message << std::endl;	\
+		sd_bus_error_free(&error);								\
+		sd_bus_message_unref(reply);								\
+		return 0;										\
+	}												\
+	sd_bus_error_free(&error);									\
+	r = sd_bus_message_peek_type(reply, &type, &contents);						\
+	if (r < 0) {											\
+		std::cerr << "Failed to sd_bus_message_peek_type: " << strerror(-r)  << std::endl;	\
+		sd_bus_message_unref(reply);								\
+		return 0;										\
+	}												\
+	r = sd_bus_message_enter_container(reply, 'v', contents);					\
+	if (r < 0) {											\
+		std::cerr << "Failed to sd_bus_message_enter_container: " << strerror(-r)  << std::endl; \
+		sd_bus_message_unref(reply);								\
+		return 0;										\
+	}												\
+	r = sd_bus_message_peek_type(reply, &type, &contents);						\
+	if (r < 0) {											\
+		sd_bus_message_unref(reply);								\
+		std::cerr << "Failed to sd_bus_message_peek_type: " << strerror(-r)  << std::endl;	\
+		return 0;										\
+	}												\
+	r = sd_bus_message_read_basic(reply, type, &basic);						\
+	if (r < 0) {											\
+		sd_bus_message_unref(reply);								\
+		std::cerr << "Failed to sd_bus_message_read_basic: " << strerror(-r)  << std::endl;	\
+		return 0;										\
+	}												\
+	r = sd_bus_message_exit_container(reply);							\
+	if (r < 0) {											\
+		sd_bus_message_unref(reply);								\
+		std::cerr << "Failed to sd_bus_message_exit_container: " << strerror(-r)  << std::endl;	\
+		return 0;										\
+	}												\
+	sd_bus_message_unref(reply);									\
+													\
+	return basic.RTYPE;										\
+}
+
+/* see :
+ * intro() { gdbus introspect --system --dest org.freedesktop.systemd1 --object-path /org/freedesktop/systemd1/unit/$1|awk '$1=="readonly"||$1=="interface"'; }
+ * intro cups_2eservice|more
+ */
+
+MAKE_DBUS_READ(uint32_t, u32, getPID, "org.freedesktop.systemd1.Service", "ExecMainPID")
+MAKE_DBUS_READ(std::string, string, getStatus, "org.freedesktop.systemd1.Unit", "ActiveState")
+MAKE_DBUS_READ(std::string, string, getSubStatus, "org.freedesktop.systemd1.Unit", "SubState")
+MAKE_DBUS_READ(std::string, string, getType, "org.freedesktop.systemd1.Service", "Type")
+
+
+
+static std::string findByPID(sd_bus *bus, uint32_t p_pid) {
 	const char *contents = NULL;
 	sd_bus_error error = SD_BUS_ERROR_NULL;
 	sd_bus_message *reply = NULL;
@@ -23,183 +101,35 @@ static uint32_t getPID(sd_bus *bus, std::string path) {
 	} basic;
 
 	int r = sd_bus_call_method(bus,
-		"org.freedesktop.systemd1",            /* service to contact */
-		path.c_str(),      /* object path */
-		"org.freedesktop.DBus.Properties", "Get",
-		&error, &reply, "ss", "org.freedesktop.systemd1.Service", "ExecMainPID");
+		"org.freedesktop.systemd1",
+		"/org/freedesktop/systemd1",
+		"org.freedesktop.systemd1.Manager", "GetUnitByPID",
+		&error, &reply, "u", p_pid);
 	if (r < 0) {
 		std::cerr << "Failed to issue method call: " << error.message << std::endl;
 		sd_bus_error_free(&error);
 		sd_bus_message_unref(reply);
-		return 0;
+		return "";
 	}
 	sd_bus_error_free(&error);
 	r = sd_bus_message_peek_type(reply, &type, &contents);
 	if (r < 0) {
 		std::cerr << "Failed to sd_bus_message_peek_type: " << strerror(-r)  << std::endl;
 		sd_bus_message_unref(reply);
-		return 0;
-	}
-	r = sd_bus_message_enter_container(reply, 'v', contents);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_enter_container: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return 0;
-	}
-	r = sd_bus_message_peek_type(reply, &type, &contents);
-	if (r < 0) {
-		sd_bus_message_unref(reply);
-		std::cerr << "Failed to sd_bus_mesSage_peek_type: " << strerror(-r)  << std::endl;
-		return 0;
+		return "";
 	}
 	r = sd_bus_message_read_basic(reply, type, &basic);
 	if (r < 0) {
 		sd_bus_message_unref(reply);
 		std::cerr << "Failed to sd_bus_message_read_basic: " << strerror(-r)  << std::endl;
-		return 0;
+		return "";
 	}
-	r = sd_bus_message_exit_container(reply);
-	if (r < 0) {
-		sd_bus_message_unref(reply);
-		std::cerr << "Failed to sd_bus_message_exit_container: " << strerror(-r)  << std::endl;
-		return 0;
-	}
+	std::string res = basic.string;
 	sd_bus_message_unref(reply);
-
-	return basic.u32;
+	res = res.substr(res.rfind('/')+1);
+	return res;
 }
 
-static std::string getStatus(sd_bus *bus, std::string path) {
-	const char *contents = NULL;
-	sd_bus_error error = SD_BUS_ERROR_NULL;
-	sd_bus_message *reply = NULL;
-	char type;
-	union {
-		uint8_t u8;
-		uint16_t u16;
-		int16_t s16;
-		uint32_t u32;
-		int32_t s32;
-		uint64_t u64;
-		int64_t s64;
-		double d64;
-		const char *string;
-		int i;
-	} basic;
-	std::string ret = "";
-
-	int r = sd_bus_call_method(bus,
-		"org.freedesktop.systemd1",            /* service to contact */
-		path.c_str(),      /* object path */
-		"org.freedesktop.DBus.Properties", "Get",
-		&error, &reply, "ss", "org.freedesktop.systemd1.Unit", "ActiveState");
-	if (r < 0) {
-		std::cerr << "Failed to issue method call: " << error.message << std::endl;
-		sd_bus_error_free(&error);
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	sd_bus_error_free(&error);
-	r = sd_bus_message_peek_type(reply, &type, &contents);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_peek_type: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	r = sd_bus_message_enter_container(reply, 'v', contents);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_enter_container: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	r = sd_bus_message_peek_type(reply, &type, &contents);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_peek_type: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	r = sd_bus_message_read_basic(reply, type, &basic);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_read_basic: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	r = sd_bus_message_exit_container(reply);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_exit_container: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	ret = basic.string;
-	sd_bus_message_unref(reply);
-	return ret;
-}
-
-static std::string getSubStatus(sd_bus *bus, std::string path) {
-	const char *contents = NULL;
-	sd_bus_error error = SD_BUS_ERROR_NULL;
-	sd_bus_message *reply = NULL;
-	char type;
-	union {
-		uint8_t u8;
-		uint16_t u16;
-		int16_t s16;
-		uint32_t u32;
-		int32_t s32;
-		uint64_t u64;
-		int64_t s64;
-		double d64;
-		const char *string;
-		int i;
-	} basic;
-	std::string ret = "";
-
-	int r = sd_bus_call_method(bus,
-		"org.freedesktop.systemd1",            /* service to contact */
-		path.c_str(),      /* object path */
-		"org.freedesktop.DBus.Properties", "Get",
-		&error, &reply, "ss", "org.freedesktop.systemd1.Unit", "SubState");
-	if (r < 0) {
-		std::cerr << "Failed to issue method call: " << error.message << std::endl;
-		sd_bus_error_free(&error);
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	sd_bus_error_free(&error);
-	r = sd_bus_message_peek_type(reply, &type, &contents);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_peek_type: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	r = sd_bus_message_enter_container(reply, 'v', contents);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_enter_container: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	r = sd_bus_message_peek_type(reply, &type, &contents);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_peek_type: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	r = sd_bus_message_read_basic(reply, type, &basic);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_read_basic: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	r = sd_bus_message_exit_container(reply);
-	if (r < 0) {
-		std::cerr << "Failed to sd_bus_message_exit_container: " << strerror(-r)  << std::endl;
-		sd_bus_message_unref(reply);
-		return ret;
-	}
-	ret = basic.string;
-	sd_bus_message_unref(reply);
-	return ret;
-}
 
 
 static sd_bus *bus = NULL;
@@ -276,6 +206,7 @@ public:
 			return;
 		}*/
 
+		// see : echo -e $(gdbus call -y -d org.freedesktop.systemd1 -o /org/freedesktop/systemd1/unit -m org.freedesktop.DBus.Introspectable.Introspect)|grep " <node "|grep service
 		int r = sd_bus_call_method(bus,
 			"org.freedesktop.systemd1",            /* service to contact */
 			"/org/freedesktop/systemd1/unit",      /* object path */
@@ -319,6 +250,9 @@ public:
 				std::string status = getSubStatus(bus, name);
 				if (status == "exited" || status == "dead" || status == "")
 					continue; // ignore exited service
+				std::string xtype = getType(bus, name);
+				if (xtype != "simple" && xtype!="notify" && xtype!="forking")
+					continue; // only service that's not dynamic too much
 
 				if (mgr->havePID(PID)) {
 					std::shared_ptr<service> serv = mgr->getService(PID);
@@ -351,6 +285,29 @@ public:
 };
 MAKE_PLUGIN_DETECTOR(systemdDetector, systemd)
 
+
+class systemdEnhancer: public serviceEnhancer {
+public:
+	systemdEnhancer(std::shared_ptr<servicesManager> p_sm): serviceEnhancer(p_sm) {}
+	std::shared_ptr<service> enhance(std::shared_ptr<service> p_serv) {
+		std::string name;
+		std::shared_ptr<process> p = p_serv->getMainProcess();
+		if (p!=nullptr  && ! p_serv->haveHandler()) {
+			name = findByPID(bus,p->getPID());
+			if (name != "" && getPID(bus,name)!=0 ) {
+				p_serv->setUniqKey(name);
+				std::shared_ptr<systemdHandler> hand = std::make_shared<systemdHandler>(p_serv);
+				hand->setID(name);
+				p_serv->setHandlerObj(hand);
+			}
+			
+		}
+		return p_serv;
+	}
+};
+MAKE_PLUGIN_ENHANCER(systemdEnhancer, systemd)
+
+
 /*
 class systemService : public service {
 public:
@@ -365,32 +322,9 @@ public:
 	}
 };
 
-class systemEnhancer: public serviceEnhancer {
-public:
-	systemEnhancer(servicesManager *p_sm): serviceEnhancer(p_sm) {}
-	service *enhance(service *p_serv) {
-		service *ret	  = NULL;
-		std::string name  = p_serv->getName();
-		if(name == "rpcbind")
-			ret = new systemService(*p_serv);
-		else if(name == "dhclient")
-			ret = new systemService(*p_serv);
-		else if(name == "exim4")
-			ret = new systemService(*p_serv);
-		else if(name == "cups-browsed")
-			ret = new printService(*p_serv);
-		else if(name == "cupsd")
-			ret = new printService(*p_serv);
-		if (ret != NULL)
-			delete p_serv;
-		return ret;
-		
-	}
-};
 
 MAKE_PLUGIN_SERVICE(printService, print)
 MAKE_PLUGIN_SERVICE(systemService, system)
-MAKE_PLUGIN_ENHANCER(systemEnhancer, system)
 */
 
 }

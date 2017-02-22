@@ -149,6 +149,7 @@ public:
 	void		addLogMonitor(const std::string p_logmonName, const std::string p_filematch);
 	std::shared_ptr<Collector>	getCollector(std::string p_name);
 	std::shared_ptr<process>	getProcess(uint32_t p_pid);
+	std::shared_ptr<process>	getMainProcess();
 	Json::Value* 	getCollectorCfg(std::string p_name);
 	Json::Value* 	getParserCfg(std::string p_name);
 	void		getCollectorsHtml(std::stringstream& stream );
