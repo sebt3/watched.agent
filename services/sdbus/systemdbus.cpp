@@ -79,6 +79,7 @@ MAKE_DBUS_READ(uint32_t, u32, getPID, "org.freedesktop.systemd1.Service", "ExecM
 MAKE_DBUS_READ(std::string, string, getStatus, "org.freedesktop.systemd1.Unit", "ActiveState")
 MAKE_DBUS_READ(std::string, string, getSubStatus, "org.freedesktop.systemd1.Unit", "SubState")
 MAKE_DBUS_READ(std::string, string, getType, "org.freedesktop.systemd1.Service", "Type")
+MAKE_DBUS_READ(std::string, string, getRestart, "org.freedesktop.systemd1.Service", "Restart")
 
 
 
@@ -179,7 +180,25 @@ MAKE_PLUGIN_HANDLER(systemdHandler,systemd)
 
 class systemdDetector: public serviceDetector {
 public:
-	systemdDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server):serviceDetector(p_sm, p_server) {
+	systemdDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg):serviceDetector(p_sm, p_server, p_cfg) {
+		Json::Value	arr_value(Json::arrayValue);
+		if (! cfg->isMember("whiteList")) {
+			(*cfg)["whiteList"]	= arr_value;
+			(*cfg)["whiteList"].setComment(std::string("/*\tConfigure the services that could be detected */"), Json::commentBefore);
+			(*cfg)["whiteList"][0]["unit-name"]	= "rsyslog_2eservice";
+			(*cfg)["whiteList"][1]["type"]		= "forking";
+			(*cfg)["whiteList"][2]["type"]		= "simple";
+			(*cfg)["whiteList"][3]["type"]		= "dbus";
+			(*cfg)["whiteList"][4]["type"]		= "notify";
+			(*cfg)["whiteList"][4]["restart"]	= "on-failure";
+		}
+		if (! cfg->isMember("blackList")) {
+			(*cfg)["blackList"]	= arr_value;
+			(*cfg)["blackList"].setComment(std::string("/*\tConfigure the services that should not be detected */"), Json::commentBefore);
+			(*cfg)["blackList"][0]["type"]		= "dbus";
+			(*cfg)["blackList"][0]["restart"]	= "no";
+			(*cfg)["blackList"][1]["unit-name"]	= "systemd_2d.*_2eservice";
+		}
 		have_bus = false;
 		int r = sd_bus_open_system(&bus);
 		if (r < 0) {
@@ -193,6 +212,41 @@ public:
 		have_bus = false;
 		sd_bus_flush_close_unref(bus);
 	}
+
+protected:
+	bool matchList(const std::string p_small, Json::Value* p_list) {
+		std::string name = "/org/freedesktop/systemd1/unit/"+p_small;
+		std::string s_type	= getType(bus, name);
+		std::string s_restart	= getRestart(bus, name);
+		for (Json::Value::iterator j = p_list->begin();j!=p_list->end();j++) {
+			bool lineMatched = false;
+			if (j->isMember("unit-name")) {
+				std::regex base_regex((*j)["unit-name"].asString());
+				std::smatch base_match;
+				if (std::regex_match(p_small, base_match, base_regex))
+					lineMatched = true;
+				else
+					lineMatched = false;
+			}
+			if (j->isMember("type")) {
+				if (s_type == (*j)["type"].asString())
+					lineMatched = true;
+				else
+					lineMatched = false;
+			}
+			if (j->isMember("restart")) {
+				if (s_restart == (*j)["restart"].asString())
+					lineMatched = true;
+				else
+					lineMatched = false;
+			}
+			if (lineMatched)
+				return true;
+		}
+
+		return false;
+	}
+public:
 	void find() {
 		sd_bus_error error = SD_BUS_ERROR_NULL;
 		sd_bus_message *m = NULL;
@@ -250,9 +304,8 @@ public:
 				std::string status = getSubStatus(bus, name);
 				if (status == "exited" || status == "dead" || status == "")
 					continue; // ignore exited service
-				std::string xtype = getType(bus, name);
-				if (xtype != "simple" && xtype!="notify" && xtype!="forking")
-					continue; // only service that's not dynamic too much
+				if (!matchList(small, &((*cfg)["whiteList"])) || matchList(small, &((*cfg)["blackList"])))
+					continue;
 
 				if (mgr->havePID(PID)) {
 					std::shared_ptr<service> serv = mgr->getService(PID);
@@ -280,6 +333,7 @@ public:
 		}
 		server->logInfo("systemdDetector::find", "found "+std::to_string(count)+" services. updated "+std::to_string(coun2));
 	}
+
 /*private:
 	sd_bus *bus = NULL;*/
 };
@@ -291,10 +345,11 @@ public:
 	systemdEnhancer(std::shared_ptr<servicesManager> p_sm): serviceEnhancer(p_sm) {}
 	std::shared_ptr<service> enhance(std::shared_ptr<service> p_serv) {
 		std::string name;
+		if (!have_bus) return p_serv;
 		std::shared_ptr<process> p = p_serv->getMainProcess();
 		if (p!=nullptr  && ! p_serv->haveHandler()) {
 			name = findByPID(bus,p->getPID());
-			if (name != "" && getPID(bus,name)!=0 ) {
+			if (name.length()>7 && name.substr(name.length()-7) == "service" ) {
 				p_serv->setUniqKey(name);
 				std::shared_ptr<systemdHandler> hand = std::make_shared<systemdHandler>(p_serv);
 				hand->setID(name);

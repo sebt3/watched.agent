@@ -147,7 +147,7 @@ private:
  */
 class LuaDetector: public serviceDetector {
 public:
-	LuaDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, const std::string p_fname);
+	LuaDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, const std::string p_fname, Json::Value* p_cfg);
 	void find();
 private:
 	sel::State state{true};
@@ -160,7 +160,7 @@ private:
  */
 class socketDetector: public serviceDetector {
 public:
-	socketDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server):serviceDetector(p_sm, p_server) {}
+	socketDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg):serviceDetector(p_sm, p_server, p_cfg) {}
 	void find();
 };
 

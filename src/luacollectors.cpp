@@ -207,7 +207,7 @@ bool	LuaServiceHandler::isBlackout() {
 /*********************************
  * LuaDetector
  */
-LuaDetector::LuaDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, const std::string p_fname):serviceDetector(p_sm, p_server) {
+LuaDetector::LuaDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, const std::string p_fname, Json::Value* p_cfg):serviceDetector(p_sm, p_server, p_cfg) {
 	std::unique_lock<std::mutex> locker(lua); // Lua isnt exactly thread safe
 	state.Load(p_fname);
 }

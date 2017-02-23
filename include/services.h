@@ -207,12 +207,13 @@ protected:
  */
 class serviceDetector {
 public:
-	serviceDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server):server(p_server), services(p_sm) {}
+	serviceDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg);
 	virtual void find() =0;
-	
+	bool enabled() { return (*cfg)["enable"].asBool(); }
 protected:
 	std::shared_ptr<HttpServer>	server;
 	std::weak_ptr<servicesManager>	services;
+	Json::Value*			cfg;
 };
 
 /*********************************
@@ -242,6 +243,7 @@ public:
 	std::shared_ptr<service> getService(uint32_t p_pid);
 	std::shared_ptr<service> enhanceFromFactory(std::string p_id, std::shared_ptr<service> p_serv);
 private:
+	Json::Value*	getDetectorCfg(std::string p_name);
 	std::vector< std::shared_ptr<service> >		services;
 	std::vector< std::shared_ptr<serviceDetector> >	detectors;
 	std::vector< std::shared_ptr<serviceEnhancer> >	enhancers;
@@ -259,7 +261,7 @@ private:
 
 typedef std::shared_ptr<service>         service_maker_t(const service& p_src);
 typedef std::shared_ptr<serviceHandler>  handler_maker_t(std::shared_ptr<service> p_s, const std::string p_luafile);
-typedef std::shared_ptr<serviceDetector> detector_maker_t(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server);
+typedef std::shared_ptr<serviceDetector> detector_maker_t(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg);
 typedef std::shared_ptr<serviceEnhancer> enhancer_maker_t(std::shared_ptr<servicesManager> p_sm);
 typedef std::shared_ptr<logParser> 	 parser_maker_t(const std::string p_logname, Json::Value* p_cfg, const std::string p_luafile);
 typedef std::shared_ptr<Collector> 	 service_collector_maker_t(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string p_filename);
@@ -331,8 +333,8 @@ proxyEnhancer_##id pe_##id;
 
 #define MAKE_PLUGIN_DETECTOR(className,id)					\
 extern "C" {									\
-std::shared_ptr<serviceDetector> makeDetector_##id(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server) {	\
-   return std::make_shared<className>(p_sm, p_server);				\
+std::shared_ptr<serviceDetector> makeDetector_##id(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg) {	\
+   return std::make_shared<className>(p_sm, p_server, p_cfg);			\
 }										\
 }										\
 class proxyDetector_##id { public:						\

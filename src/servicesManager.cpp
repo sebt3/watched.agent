@@ -88,13 +88,13 @@ void servicesManager::init() {
 	} else	server->logWarning("servicesManager::", directory+" doesnt exist. No services plugins will be used");
 	
 	serviceCollectorFactory["self"] = std::make_pair(
-		[](std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string p_fname) -> std::shared_ptr<Collector> {
+		[](std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg, std::shared_ptr<service> p_s, const std::string) -> std::shared_ptr<Collector> {
 			return std::make_shared<SelfCollector>(p_srv, p_cfg, p_s);
 		},"");
 
 	// Instanciate the detector classes
 	for(std::map<std::string, detector_maker_t* >::iterator factit = detectorFactory.begin();factit != detectorFactory.end(); factit++)
-		detectors.push_back(factit->second(shared_from_this(), server));
+		detectors.push_back(factit->second(shared_from_this(), server, getDetectorCfg(factit->first)));
 
 	// then the enhancer
 	for(std::map<std::string, enhancer_maker_t* >::iterator factit = enhancerFactory.begin();factit != enhancerFactory.end(); factit++)
@@ -140,13 +140,13 @@ void servicesManager::init() {
 						}, full_file_name);
 				}
 				if (q->isType("detector"))
-					detectors.push_back(std::make_shared<LuaDetector>(shared_from_this(), server, full_file_name));
+					detectors.push_back(std::make_shared<LuaDetector>(shared_from_this(), server, full_file_name, getDetectorCfg(name)));
 			}
 		}
 		closedir(dir);
 	} else	server->logWarning("servicesManager::", dirlua+" doesnt exist. No lua services plugins will be used");
 
-	detectors.push_back(std::make_shared<socketDetector>(shared_from_this(), server));
+	detectors.push_back(std::make_shared<socketDetector>(shared_from_this(), server, getDetectorCfg("socket")));
 
 	systemCollectors	= std::make_shared<CollectorsManager>(server,cfg);
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -174,7 +174,7 @@ void servicesManager::startThreads() {
 	systemCollectors->startThreads();
 	active = true;
 	my_thread = std::thread ([this]() {
-		Json::Value*		servCfg	  = cfg->getServices();
+		Json::Value*	servCfg	  = cfg->getServices();
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		do {
 			try {
@@ -187,6 +187,18 @@ void servicesManager::startThreads() {
 		
 	});
 
+}
+
+Json::Value*	servicesManager::getDetectorCfg(std::string p_name) {
+	Json::Value	obj_value(Json::objectValue);
+	Json::Value*	servCfg	  = cfg->getServices();
+	if(! servCfg->isMember("detectors")) {
+		(*servCfg)["detectors"][p_name] = obj_value;
+		(*servCfg)["detectors"].setComment(std::string("/*\tConfigure the detectors plugins */"), Json::commentBefore);
+	}else if(! (*servCfg)["detectors"].isMember(p_name) ) {
+		(*servCfg)["detectors"][p_name] = obj_value;
+	}
+	return &((*servCfg)["detectors"][p_name]); 
 }
 
 void servicesManager::updateService(std::shared_ptr<service> p_serv) {
@@ -228,7 +240,8 @@ void servicesManager::addService(std::shared_ptr<service> p_serv) {
 
 void servicesManager::find() {
 	for (std::vector< std::shared_ptr<serviceDetector> >::iterator i=detectors.begin();i!=detectors.end();i++)
-		(*i)->find();
+		if ((*i)->enabled())
+			(*i)->find();
 }
 
 bool	servicesManager::haveSocket(uint32_t p_socket_id) {
@@ -543,6 +556,13 @@ void servicesManager::doGetJson(response_ptr response, request_ptr request) {
 /*********************************
  * Detectors  
  */
+serviceDetector::serviceDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg):server(p_server), services(p_sm), cfg(p_cfg) {
+	if(! cfg->isMember("enable")) {
+		(*cfg)["enable"] = true;
+		(*cfg)["enable"].setComment(std::string("/*\t\tEnable this plugin ?*/"), Json::commentAfterOnSameLine);
+	}
+}
+
 void socketDetector::find(void) {
 	std::shared_ptr<servicesManager> mgr = services.lock();
 	uint16_t count = 0;
