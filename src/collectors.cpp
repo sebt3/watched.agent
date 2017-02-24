@@ -92,7 +92,8 @@ void Ressource::getDefinition(Json::Value* p_defs) {
  * pidRessource
  */
 void pidRessource::nextValue() {
-	Ressource::nextValue();
+	if (values.size()>0)
+		Ressource::nextValue();
 	for(std::map<std::string,std::map<uint64_t,uint64_t>>::iterator i=values.begin();i!=values.end();i++)
 		v[0][i->first] = 0.0;
 }
@@ -258,7 +259,7 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
 	std::stringstream stream;
         stream << server->getHead(desc[id], sub);
 	stream << "<div class=\"row\"><div class=\"col-md-12\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Graphics</h3></div><div class=\"box-body\"><div class=\"chart\"><div id=\"" << name.c_str() << "-graph\"></div>\n</div></div></div></div></div>\n";
-        stream << server->getFoot("watchedLive('"+name+"-graph','"+basePath+name+"/"+id.c_str()+"/history',"+((*cfg)["poll-frequency"].asString())+")");
+        stream << server->getFoot("chart = watchedLive('"+name+"-graph','"+basePath+name+"/"+id.c_str()+"/history',"+((*cfg)["poll-frequency"].asString())+");\n");
         setResponseHtml(response, stream.str());
 }
 
