@@ -186,11 +186,12 @@ public:
 			(*cfg)["whiteList"]	= arr_value;
 			(*cfg)["whiteList"].setComment(std::string("/*\tConfigure the services that could be detected */"), Json::commentBefore);
 			(*cfg)["whiteList"][0]["unit-name"]	= "rsyslog_2eservice";
-			(*cfg)["whiteList"][1]["type"]		= "forking";
-			(*cfg)["whiteList"][2]["type"]		= "simple";
-			(*cfg)["whiteList"][3]["type"]		= "dbus";
-			(*cfg)["whiteList"][4]["type"]		= "notify";
-			(*cfg)["whiteList"][4]["restart"]	= "on-failure";
+			(*cfg)["whiteList"][1]["unit-name"]	= "watched_2eback_2eservice";
+			(*cfg)["whiteList"][2]["type"]		= "forking";
+			(*cfg)["whiteList"][3]["type"]		= "simple";
+			(*cfg)["whiteList"][4]["type"]		= "dbus";
+			(*cfg)["whiteList"][5]["type"]		= "notify";
+			(*cfg)["whiteList"][5]["restart"]	= "on-failure";
 		}
 		if (! cfg->isMember("blackList")) {
 			(*cfg)["blackList"]	= arr_value;
@@ -345,7 +346,7 @@ public:
 	systemdEnhancer(std::shared_ptr<servicesManager> p_sm): serviceEnhancer(p_sm) {}
 	std::shared_ptr<service> enhance(std::shared_ptr<service> p_serv) {
 		std::string name;
-		if (!have_bus) return p_serv;
+		if (!have_bus) return nullptr;
 		std::shared_ptr<process> p = p_serv->getMainProcess();
 		if (p!=nullptr  && ! p_serv->haveHandler()) {
 			name = findByPID(bus,p->getPID());
@@ -357,7 +358,7 @@ public:
 			}
 			
 		}
-		return p_serv;
+		return nullptr;
 	}
 };
 MAKE_PLUGIN_ENHANCER(systemdEnhancer, systemd)

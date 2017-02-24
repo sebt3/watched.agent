@@ -210,10 +210,10 @@ void servicesManager::addService(std::shared_ptr<service> p_serv) {
 	std::shared_ptr<service> add = p_serv;
 	// try to improve the service
 	for(std::vector<std::shared_ptr<serviceEnhancer> >::iterator i=enhancers.begin();i!=enhancers.end();i++) {
-		std::shared_ptr<service> s = (*i)->enhance(p_serv);
+		std::shared_ptr<service> s = (*i)->enhance(add);
 		if (s!=NULL) {
 			add=s;
-			break;
+			//break;
 		}
 	}
 
@@ -251,6 +251,7 @@ bool	servicesManager::haveSocket(uint32_t p_socket_id) {
 }
 
 std::shared_ptr<service> servicesManager::enhanceFromFactory(std::string p_id, std::shared_ptr<service> p_serv) {
+	//server->logNotice("servicesManager::enhanceFromFactory", p_serv->getName()+" - "+p_id);
 	for(std::map<std::string, service_maker_t* >::iterator i=serviceFactory.begin();i!=serviceFactory.end();i++) {
 		if (i->first == p_id)
 			return i->second(*p_serv);
@@ -563,6 +564,38 @@ serviceDetector::serviceDetector(std::shared_ptr<servicesManager> p_sm, std::sha
 	}
 }
 
+socketDetector::socketDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg):serviceDetector(p_sm, p_server, p_cfg) {
+		Json::Value	arr_value(Json::arrayValue);
+		if (! cfg->isMember("blackList")) {
+			(*cfg)["blackList"]	= arr_value;
+			(*cfg)["blackList"].setComment(std::string("/*\tConfigure the services that should not be detected */"), Json::commentBefore);
+			(*cfg)["blackList"][0]["path"]		= "/sbin/rpc.statd";
+			(*cfg)["blackList"][1]["path"]		= "/sbin/dhclient";
+			(*cfg)["blackList"][2]["path"]		= "/usr/sbin/avahi-daemon";
+		}
+}
+
+bool socketDetector::matchList(std::shared_ptr<process> p, Json::Value* p_list) {
+		for (Json::Value::iterator j = p_list->begin();j!=p_list->end();j++) {
+			bool lineMatched = false;
+			if (j->isMember("path")) {
+				if (p->getPath() == (*j)["path"].asString())
+					lineMatched = true;
+				else
+					lineMatched = false;
+			}
+			if (j->isMember("name")) {
+				if (p->getName() == (*j)["name"].asString())
+					lineMatched = true;
+				else
+					lineMatched = false;
+			}
+			if (lineMatched)
+				return true;
+		}
+		return false;
+}
+
 void socketDetector::find(void) {
 	std::shared_ptr<servicesManager> mgr = services.lock();
 	uint16_t count = 0;
@@ -625,6 +658,8 @@ void socketDetector::find(void) {
 			mgr->handleSubProcess(p);
 			continue;
 		}
+		if (matchList(p, &((*cfg)["blackList"])))
+			continue;
 		p->setSockets();
 
 		for(std::vector< std::shared_ptr<socket> >::iterator it = sockets.begin(); it != sockets.end(); ++it) {

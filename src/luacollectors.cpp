@@ -164,7 +164,7 @@ std::shared_ptr<service> LuaServiceEnhancer::enhance(std::shared_ptr<service> p_
 		"updateBasePaths",	&service::updateBasePaths,
 		"setName",		&service::setName
 	);
-
+	
 	state("enhance(p_serv)");
 	return nullptr;
 }

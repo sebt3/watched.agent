@@ -160,8 +160,10 @@ private:
  */
 class socketDetector: public serviceDetector {
 public:
-	socketDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg):serviceDetector(p_sm, p_server, p_cfg) {}
+	socketDetector(std::shared_ptr<servicesManager> p_sm, std::shared_ptr<HttpServer> p_server, Json::Value* p_cfg);
 	void find();
+protected:
+	bool matchList(std::shared_ptr<process> p, Json::Value* p_list);
 };
 
 /*********************************
