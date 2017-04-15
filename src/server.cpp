@@ -42,7 +42,7 @@ void default_resource_send(std::shared_ptr<SWHttpServer> server, std::shared_ptr
 	if((read_length=ifs->read(&(*buffer)[0], buffer->size()).gcount())>0) {
 		response->write(&(*buffer)[0], read_length);
 		if(read_length==static_cast<std::streamsize>(buffer->size())) {
-			server->send(response, [&server, response, ifs, buffer](const std::error_code &ec) {
+			server->send(response, [server, response, ifs, buffer](const std::error_code &ec) {
 				if(!ec)
 					default_resource_send(server, response, ifs, buffer);
 				/*else
@@ -58,7 +58,7 @@ void defaults_resource_send(std::shared_ptr<SWHttpsServer> server, std::shared_p
 	if((read_length=ifs->read(&(*buffer)[0], buffer->size()).gcount())>0) {
 		response->write(&(*buffer)[0], read_length);
 		if(read_length==static_cast<std::streamsize>(buffer->size())) {
-			server->send(response, [&server, response, ifs, buffer](const std::error_code &ec) {
+			server->send(response, [server, response, ifs, buffer](const std::error_code &ec) {
 				if(!ec)
 					defaults_resource_send(server, response, ifs, buffer);
 				/*else
@@ -197,7 +197,7 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 					
 					ifs->seekg(0, std::ios::beg);
 					
-					*response << "HTTP/1.1 200 OK\r\nContent-Length: " << length << "\r\n\r\n";
+					*response << "HTTP/1.1 200 OK\r\nCache-Control: max-age=86400\r\nETag: \""+hash+"\"\r\nContent-Length: " << length << "\r\n\r\n";
 					default_resource_send(http, response, ifs, buffer);
 				}
 				else
@@ -271,7 +271,7 @@ std::string HttpServer::getHead(std::string p_title, std::string p_sub) {
 }
 
 std::string HttpServer::getFoot(std::string p_script) {
-	return "</section></div><footer class=\"main-footer\"><div class=\"pull-right hidden-xs\"><b>Version</b> 0.1.0    </div><strong>Copyright &copy; 2016<a href=\"https://github.com/sebt3\">Sébastien Huss</a>.</strong> All rights reserved.</footer></div>\n<script src=\"/js/jquery-2.2.3.min.js\"></script>\n<script src=\"/js/bootstrap.min.js\"></script>\n<script src=\"/js/Chart.min.js\"></script>\n<script src=\"/js/adminlte.min.js\"></script>\n<script src=\"/js/d3.v4.min.js\"></script>\n<script src=\"/js/watched.js\"></script>\n<script src=\"/js/watched.line.js\"></script>\n<script>\n"+p_script+"</script>\n</body>\n</html>\n";
+	return "</section></div><footer class=\"main-footer\"><div class=\"pull-right hidden-xs\"><b>Version</b> 0.1.0    </div><strong>Copyright &copy; 2016<a href=\"https://github.com/sebt3\">Sébastien Huss</a>.</strong> All rights reserved.</footer></div>\n<script src=\"/js/jquery-2.2.3.min.js\"></script>\n<script src=\"/js/bootstrap.min.js\"></script>\n<script src=\"/js/adminlte.min.js\"></script>\n<script src=\"/js/d3.v4.min.js\"></script>\n<script src=\"/js/watched.js\"></script>\n<script src=\"/js/watched.line.js\"></script>\n<script>\n"+p_script+"</script>\n</body>\n</html>\n";
 }
 
 }
