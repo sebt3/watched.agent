@@ -2,8 +2,8 @@
 #include "config.h"
 #include <fstream>
 #include <chrono>
-#include <boost/lexical_cast.hpp>
-#include <boost/filesystem.hpp>
+//#include <boost/lexical_cast.hpp>
+//#include <boost/filesystem.hpp>
 #include <openssl/sha.h>
 #include <iostream>
 #include <iomanip>
@@ -42,7 +42,7 @@ void default_resource_send(std::shared_ptr<SWHttpServer> server, std::shared_ptr
 	if((read_length=ifs->read(&(*buffer)[0], buffer->size()).gcount())>0) {
 		response->write(&(*buffer)[0], read_length);
 		if(read_length==static_cast<std::streamsize>(buffer->size())) {
-			server->send(response, [&server, response, ifs, buffer](const boost::system::error_code &ec) {
+			server->send(response, [&server, response, ifs, buffer](const std::error_code &ec) {
 				if(!ec)
 					default_resource_send(server, response, ifs, buffer);
 				/*else
@@ -58,7 +58,7 @@ void defaults_resource_send(std::shared_ptr<SWHttpsServer> server, std::shared_p
 	if((read_length=ifs->read(&(*buffer)[0], buffer->size()).gcount())>0) {
 		response->write(&(*buffer)[0], read_length);
 		if(read_length==static_cast<std::streamsize>(buffer->size())) {
-			server->send(response, [&server, response, ifs, buffer](const boost::system::error_code &ec) {
+			server->send(response, [&server, response, ifs, buffer](const std::error_code &ec) {
 				if(!ec)
 					defaults_resource_send(server, response, ifs, buffer);
 				/*else
@@ -93,13 +93,13 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 	if (useSSL) {
 		https = std::make_shared<SWHttpsServer>(port_i, 1, sslcert, sslkey, 5, 300, sslvrf);
 		https->config.address  = (*cfg)["host"].asString();
-		https->on_error = [this](request_ptr_s req, const boost::system::error_code& ec)  {
+		https->on_error = [this](request_ptr_s req, const std::error_code& ec)  {
 			std::string err = ec.message();
-			if (ec.category() == boost::asio::error::get_ssl_category()) {
+			if (ec.category() == asio::error::get_ssl_category()) {
 				err = std::string(" (")
-					+boost::lexical_cast<std::string>(ERR_GET_LIB(ec.value()))+","
-					+boost::lexical_cast<std::string>(ERR_GET_FUNC(ec.value()))+","
-					+boost::lexical_cast<std::string>(ERR_GET_REASON(ec.value()))+") ";
+					+std::to_string(ERR_GET_LIB(ec.value()))+","
+					+std::to_string(ERR_GET_FUNC(ec.value()))+","
+					+std::to_string(ERR_GET_REASON(ec.value()))+") ";
 				char buf[128];
 				::ERR_error_string_n(ec.value(), buf, sizeof(buf));
 				err += buf;
@@ -108,19 +108,19 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 		};
 
 		https->default_resource["GET"]=[this](std::shared_ptr<SWHttpsServer::Response> response, std::shared_ptr<SWHttpsServer::Request> request) {
+			struct stat st;
 			try {
-				auto web_root_path=boost::filesystem::canonical((*cfg)["web_root"].asString());
-				auto path=boost::filesystem::canonical(web_root_path/request->path);
-				//Check if path is within web_root_path
-				if(std::distance(web_root_path.begin(), web_root_path.end())>std::distance(path.begin(), path.end()) ||
-				!std::equal(web_root_path.begin(), web_root_path.end(), path.begin()))
-					throw std::invalid_argument("path must be within root path");
-				if(boost::filesystem::is_directory(path))
-					path/="index.html";
-				if(!(boost::filesystem::exists(path) && boost::filesystem::is_regular_file(path)))
+				const std::string web_root_path=(*cfg)["web_root"].asString();
+				std::string path=web_root_path+"/"+request->path;
+				if (stat(path.c_str(), &st) == -1)
+					throw std::invalid_argument("file does not exist");
+				const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+				if (is_directory)
+					path += "/index.html";
+				if (stat(path.c_str(), &st) == -1)
 					throw std::invalid_argument("file does not exist");
 
-				std::string hash = sha256(path.string());
+				std::string hash = sha256(path);
 				auto it=request->header.find("If-None-Match");
 				if(it!=request->header.end()) {
 					if (it->second == "\""+hash+"\"") {
@@ -130,7 +130,7 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 				}
 
 				auto ifs=std::make_shared<std::ifstream>();
-				ifs->open(path.string(), std::ifstream::in | std::ios::binary);
+				ifs->open(path, std::ifstream::in | std::ios::binary);
 				
 				if(*ifs) {
 					//read and send 128 KB at a time
@@ -156,26 +156,26 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 	} else {
 		http = std::make_shared<SWHttpServer>(port_i, 1);
 		http->config.address  = (*cfg)["host"].asString();
-		http->on_error = [this](request_ptr_h req, const boost::system::error_code& ec)  {
+		http->on_error = [this](request_ptr_h req, const std::error_code& ec)  {
 			std::string err = ec.message();
 			if (err!="Operation canceled")
 				logNotice("HttpServer::httpOnError", err);
 		};
 
 		http->default_resource["GET"]=[this](std::shared_ptr<SWHttpServer::Response> response, std::shared_ptr<SWHttpServer::Request> request) {
+			struct stat st;
 			try {
-				auto web_root_path=boost::filesystem::canonical((*cfg)["web_root"].asString());
-				auto path=boost::filesystem::canonical(web_root_path/request->path);
-				//Check if path is within web_root_path
-				if(std::distance(web_root_path.begin(), web_root_path.end())>std::distance(path.begin(), path.end()) ||
-				!std::equal(web_root_path.begin(), web_root_path.end(), path.begin()))
-					throw std::invalid_argument("path must be within root path");
-				if(boost::filesystem::is_directory(path))
-					path/="index.html";
-				if(!(boost::filesystem::exists(path) && boost::filesystem::is_regular_file(path)))
+				const std::string web_root_path=(*cfg)["web_root"].asString();
+				std::string path=web_root_path+"/"+request->path;
+				if (stat(path.c_str(), &st) == -1)
+					throw std::invalid_argument("file does not exist");
+				const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+				if (is_directory)
+					path += "/index.html";
+				if (stat(path.c_str(), &st) == -1)
 					throw std::invalid_argument("file does not exist");
 
-				std::string hash = sha256(path.string());
+				std::string hash = sha256(path);
 				auto it=request->header.find("If-None-Match");
 				if(it!=request->header.end()) {
 					if (it->second == "\""+hash+"\"") {
@@ -185,7 +185,7 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 				}
 
 				auto ifs=std::make_shared<std::ifstream>();
-				ifs->open(path.string(), std::ifstream::in | std::ios::binary);
+				ifs->open(path, std::ifstream::in | std::ios::binary);
 				
 				if(*ifs) {
 					//read and send 128 KB at a time

@@ -88,6 +88,14 @@ void socket::setSockFrom6(std::string src, struct sock_addr *sa) {
 	buf = src.substr(30,2)+src.substr(28,2);	sa->ip7  = strtoul(buf.c_str(), NULL, 16);
 }
 
+bool	socket::isLoopBack() {
+	if (type == "tcp" || type == "udp")
+		return source.ip1 == 127 && source.ip2==0 && source.ip3 ==0;
+	else
+		return source.ip1 == 0 && source.ip2==0 && source.ip3 ==0 && source.ip4 ==0 && source.ip5 ==0 && source.ip6 ==0 && source.ip7 ==0 && source.ip8 ==1;
+
+}
+
 std::string socket::getSource() {
 	std::string ret;
 	if (type == "tcp" || type == "udp")

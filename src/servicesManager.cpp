@@ -569,37 +569,41 @@ socketDetector::socketDetector(std::shared_ptr<servicesManager> p_sm, std::share
 		if (! cfg->isMember("blackList")) {
 			(*cfg)["blackList"]	= arr_value;
 			(*cfg)["blackList"].setComment(std::string("/*\tConfigure the services that should not be detected */"), Json::commentBefore);
-			(*cfg)["blackList"][0]["path"]		= "/sbin/rpc.statd";
+			(*cfg)["blackList"][0]["interface"]	= "loopback";
 			(*cfg)["blackList"][1]["path"]		= "/sbin/dhclient";
 			(*cfg)["blackList"][2]["path"]		= "/usr/sbin/avahi-daemon";
+			(*cfg)["blackList"][3]["path"]		= "/sbin/rpc.statd";
+			(*cfg)["blackList"][4]["path"]		= "/sbin/rpcbind";
+			(*cfg)["blackList"][5]["name"]		= "cups-browsed";
 		}
 }
 
 bool socketDetector::matchList(std::shared_ptr<process> p, Json::Value* p_list) {
-		for (Json::Value::iterator j = p_list->begin();j!=p_list->end();j++) {
-			bool lineMatched = false;
-			if (j->isMember("path")) {
-				if (p->getPath() == (*j)["path"].asString())
-					lineMatched = true;
-				else
-					lineMatched = false;
-			}
-			if (j->isMember("name")) {
-				if (p->getName() == (*j)["name"].asString())
-					lineMatched = true;
-				else
-					lineMatched = false;
-			}
-			if (lineMatched)
-				return true;
+	for (Json::Value::iterator j = p_list->begin();j!=p_list->end();j++) {
+		bool lineMatched = false;
+		if (j->isMember("path")) {
+			if (p->getPath() == (*j)["path"].asString())
+				lineMatched = true;
+			else
+				lineMatched = false;
 		}
-		return false;
+		if (j->isMember("name")) {
+			if (p->getName() == (*j)["name"].asString())
+				lineMatched = true;
+			else
+				lineMatched = false;
+		}
+		if (lineMatched)
+			return true;
+	}
+	return false;
 }
 
 void socketDetector::find(void) {
 	std::shared_ptr<servicesManager> mgr = services.lock();
 	uint16_t count = 0;
 	uint16_t coun2 = 0;
+	bool	ignoreLoopback = false;
 	if (!mgr) return;
 	std::map<std::string,std::string> files;
 	files["tcp"]  = "/proc/net/tcp";
@@ -607,9 +611,15 @@ void socketDetector::find(void) {
 	files["tcp6"] = "/proc/net/tcp6";
 	files["udp6"] = "/proc/net/udp6";
 
+	for (Json::Value::iterator j = (*cfg)["blackList"].begin();j!=(*cfg)["blackList"].end();j++) {
+		if (j->isMember("interface") && (*j)["interface"] == "loopback")
+			ignoreLoopback = true;
+	}
+
 	std::vector< std::shared_ptr<socket> > sockets;
 	for (std::map<std::string,std::string>::iterator i=files.begin();i!=files.end();i++) {
 		std::ifstream infile(i->second);
+		std::shared_ptr<socket> s;
 		std::string line;
 		while(infile.good() && getline(infile, line)) {
 			std::istringstream iss(line);
@@ -619,7 +629,10 @@ void socketDetector::find(void) {
 				continue; // keep only listening sockets
 			if (tokens[3] != "07" && i->first.substr(0,3) == "udp")
 				continue; // keep only listening sockets
-			sockets.push_back(std::make_shared<socket>(line, i->first));
+			s = std::make_shared<socket>(line, i->first);
+			if (ignoreLoopback && s->isLoopBack())
+				continue;
+			sockets.push_back(s);
 		}
 		if (infile.good())
 			infile.close();

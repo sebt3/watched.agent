@@ -67,13 +67,14 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
-find_package(Boost 1.54.0 COMPONENTS ${BOOST_COMPONENTS} REQUIRED)
+#find_package(Boost 1.54.0 COMPONENTS ${BOOST_COMPONENTS} REQUIRED)
+find_package(Asio REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Jsoncpp REQUIRED)
 #find_package(DBusCpp)
 find_package(Lua 5.2 REQUIRED)
 include(${CMAKE_SOURCE_DIR}/cmake/Modules/systemdservice.cmake)
-include_directories(SYSTEM ${JSONCPP_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${LUA_INCLUDE_DIR})
+include_directories(SYSTEM ${JSONCPP_INCLUDE_DIR} ${Asio_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${LUA_INCLUDE_DIR})
 
 ####
 ## Sources
@@ -155,7 +156,7 @@ endforeach( service_cpp ${SERVICES_SOURCE_FILES} )
 
 # the agent itself
 add_executable(watched.agent ${AGT_SOURCE_FILES} ${PROJECT_BINARY_DIR}/agent.config.json)
-target_link_libraries(watched.agent dl ${JSONCPP_LIBRARIES} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${LUA_LIBRARIES})
+target_link_libraries(watched.agent dl ${JSONCPP_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${LUA_LIBRARIES})
 install(TARGETS watched.agent DESTINATION sbin COMPONENT binaries)
 install(FILES ${PROJECT_BINARY_DIR}/agent.config.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched COMPONENT config)
 install(DIRECTORY DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/watched/services)

@@ -29,6 +29,7 @@ public:
 	socket(std::string p_source);
 	uint32_t 	getID() { return id; }
 	std::string 	getSource();
+	bool		isLoopBack();
 protected:
 	uint32_t	 id;
 	std::string	 type;

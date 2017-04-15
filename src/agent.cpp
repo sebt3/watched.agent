@@ -3,8 +3,6 @@
 #include <chrono>
 using namespace watcheD;
 
-#include <boost/lexical_cast.hpp>
-#include <boost/filesystem.hpp>
 #include <openssl/sha.h>
 #include <iostream>
 #include <iomanip>
