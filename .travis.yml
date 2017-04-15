@@ -13,13 +13,14 @@ addons:
     - ubuntu-toolchain-r-test
     packages:
     - clang
+    - libboost1.55-all-dev
     - libmysql++-dev
     - libssl-dev
     - liblua5.2-dev
     - cmake
 
 before_script:
-    - sudo apt-get install -y libmysql++-dev libssl-dev cmake liblua5.2-dev
+    - sudo apt-get install -y libboost1.55-all-dev libmysql++-dev libssl-dev cmake liblua5.2-dev
     - ./tools/travis/installdeps.sh
 
 script:
