@@ -2,7 +2,13 @@
 #define	SERVER_HTTPS_HPP
 
 #include "server_http.hpp"
+
+#ifdef USE_STANDALONE_ASIO
 #include <asio/ssl.hpp>
+#else
+#include <boost/asio/ssl.hpp>
+#endif
+
 #include <openssl/ssl.h>
 #include <algorithm>
 
@@ -56,7 +62,7 @@ namespace SimpleWeb {
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
             auto socket=std::make_shared<HTTPS>(*io_service, context);
 
-            acceptor->async_accept((*socket).lowest_layer(), [this, socket](const std::error_code& ec) {
+            acceptor->async_accept((*socket).lowest_layer(), [this, socket](const error_code& ec) {
                 //Immediately start accepting a new connection (if io_service hasn't been stopped)
                 if (ec != asio::error::operation_aborted)
                     accept();
@@ -69,7 +75,7 @@ namespace SimpleWeb {
                     //Set timeout on the following asio::ssl::stream::async_handshake
                     auto timer=get_timeout_timer(socket, config.timeout_request);
                     socket->async_handshake(asio::ssl::stream_base::server, [this, socket, timer]
-                            (const std::error_code& ec) {
+                            (const error_code& ec) {
                         if(timer)
                             timer->cancel();
                         if(!ec)

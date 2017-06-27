@@ -57,6 +57,7 @@ public:
 	~CollectorsManager();
 	void startThreads();
 	void getJson(Json::Value* p_defs);
+	void getSystemJson(Json::Value* p_defs, double since);
 	void getIndexHtml(std::stringstream& stream );
 private:
 	std::shared_ptr<HttpServer> server;

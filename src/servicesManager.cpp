@@ -151,6 +151,8 @@ void servicesManager::init() {
 	systemCollectors	= std::make_shared<CollectorsManager>(server,cfg);
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	associate(server,"GET","^/$",doGetRootPage);
+	associate(server,"GET","^/all$",doGetAllJson);
+	associate(server,"GET","^/all.since=([0-9.]*)$",doGetAllJson);
 	associate(server,"GET","^/service/(.*)/status$",doGetServiceStatus);
 	associate(server,"GET","^/service/(.*)/log$",doGetServiceLog);
 	associate(server,"GET","^/service/(.*)/log.since=([0-9.]*)$",doGetServiceLog);
@@ -281,7 +283,7 @@ void	servicesManager::handleSubProcess(std::shared_ptr<process> p_p) {
 	}
 }
 
-void	servicesManager::doGetServiceStatus(response_ptr response, request_ptr request) {
+void	servicesManager::doGetServiceStatus(response_ptr response, request_ptr request, query_args args) {
 	std::stringstream ss;
 	std::string id   = (*request)[0];
 	Json::Value obj(Json::objectValue);
@@ -289,10 +291,12 @@ void	servicesManager::doGetServiceStatus(response_ptr response, request_ptr requ
 	if (id == "all") {
 		for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
 			res[(*i)->getID()] = obj;
+			server->logInfo("servicesManager::doGetServiceStatus", "Getting "+(*i)->getID()+" status");
 			(*i)->getJsonStatus( &(res[(*i)->getID()]) );
 		}
 		ss << res;
 		setResponseJson(response, ss.str());
+		server->logInfo("servicesManager::doGetServiceStatus", "All done");
 		return;
 	}
 
@@ -310,15 +314,13 @@ void	servicesManager::doGetServiceStatus(response_ptr response, request_ptr requ
 	setResponseJson(response, ss.str());
 }
 
-void	servicesManager::doGetServiceLog(response_ptr response, request_ptr request) {
+void	servicesManager::doGetServiceLog(response_ptr response, request_ptr request, query_args args) {
 	std::stringstream ss;
 	std::string id  = (*request)[0];
 	double since  = -1;
-	if (request->size()>1) {
-		try {
-			since=stod((*request)[1]);
-		} catch (std::exception &e) { }
-	}
+	for(auto &pair: args)
+		if (pair.first == "since")
+			since=stod(pair.second);
 	Json::Value obj(Json::objectValue);
 	Json::Value res(Json::objectValue);
 	if (id == "all") {
@@ -346,8 +348,40 @@ void	servicesManager::doGetServiceLog(response_ptr response, request_ptr request
 	setResponseJson(response, ss.str());
 }
 
+void	servicesManager::doGetAllJson(response_ptr response, request_ptr request, query_args args) {
+	double since  = -1;
+	for(auto &pair: args)
+		if (pair.first == "since")
+			since=stod(pair.second);
 
-void	servicesManager::doGetServiceHtml(response_ptr response, request_ptr request) {
+	Json::Value res(Json::objectValue);
+	Json::Value obj(Json::objectValue);
+	server->logInfo("servicesManager::doGetAllJson", "Getting services");
+	res["services"] = obj;
+	res["system"] = obj;
+	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
+		res["services"][(*i)->getID()] = obj;
+		res["services"][(*i)->getID()]["status"] = obj;
+		res["services"][(*i)->getID()]["logs"] = obj;
+		res["services"][(*i)->getID()]["collectors"] = obj;
+		(*i)->getJsonStatus( &(res["services"][(*i)->getID()]["status"]) );
+		(*i)->getJsonLogHistory( &(res["services"][(*i)->getID()]["logs"]), since);
+		(*i)->getJsonCollectorHistory( &(res["services"][(*i)->getID()]["collectors"]), since);
+	}
+	server->logInfo("servicesManager::doGetAllJson", "Getting system metrics");
+	res["system"] = obj;
+	systemCollectors->getSystemJson(&(res["system"]),since);
+
+	// Making this JSON the shortest possible to reduce network stress
+	Json::StreamWriterBuilder wbuilder;
+	wbuilder["indentation"] = "";
+	wbuilder["commentStyle"] = "None";
+	setResponseJson(response, Json::writeString(wbuilder, res));
+	server->logInfo("servicesManager::doGetAllJson", "All done");
+}
+
+
+void	servicesManager::doGetServiceHtml(response_ptr response, request_ptr request, query_args args) {
 	std::stringstream ss;
 	std::string id   = (*request)[0];
 	Json::Value res(Json::objectValue);
@@ -404,7 +438,7 @@ void	servicesManager::doGetServiceHtml(response_ptr response, request_ptr reques
 	setResponse404(response, "No service matching '" + id + "' found");
 }
 
-void	servicesManager::doGetCollectorHistory(response_ptr response, request_ptr request) {
+void	servicesManager::doGetCollectorHistory(response_ptr response, request_ptr request, query_args args) {
 	std::stringstream ss;
 	std::string id   = (*request)[0];
 	std::string cid   = (*request)[1];
@@ -421,7 +455,7 @@ void	servicesManager::doGetCollectorHistory(response_ptr response, request_ptr r
 			}
 			request->erase(request->begin());
 			request->erase(request->begin());
-			c->doGetHistory(response,request);
+			c->doGetHistory(response,request,args);
 			return;
 		}
 	}
@@ -431,7 +465,7 @@ void	servicesManager::doGetCollectorHistory(response_ptr response, request_ptr r
 	setResponseJson(response, ss.str());
 }
 
-void	servicesManager::doGetCollectorGraph(response_ptr response, request_ptr request) {
+void	servicesManager::doGetCollectorGraph(response_ptr response, request_ptr request, query_args args) {
 	std::stringstream ss;
 	std::string id   = (*request)[0];
 	std::string cid   = (*request)[1];
@@ -447,7 +481,7 @@ void	servicesManager::doGetCollectorGraph(response_ptr response, request_ptr req
 			}
 			request->erase(request->begin());
 			request->erase(request->begin());
-			c->doGetGraph(response,request);
+			c->doGetGraph(response,request,args);
 			return;
 		}
 	}
@@ -455,7 +489,7 @@ void	servicesManager::doGetCollectorGraph(response_ptr response, request_ptr req
 	setResponse404(response, "No service matching '" + id + "' found");
 }
 
-void servicesManager::doGetRootPage(response_ptr response, request_ptr request) {
+void servicesManager::doGetRootPage(response_ptr response, request_ptr request, query_args args) {
 	std::stringstream stream;
         stream << server->getHead("Home");
 	stream << "<div class=\"row\"><div class=\"col-md-3\"><div class=\"box box-default\"><div class=\"box-header with-border\"><h3 class=\"box-title\">Services</h3></div><div class=\"box-body\">\n";
@@ -472,7 +506,7 @@ void servicesManager::doGetRootPage(response_ptr response, request_ptr request) 
         setResponseHtml(response, stream.str());
 }
 
-void servicesManager::doGetJson(response_ptr response, request_ptr request) {
+void servicesManager::doGetJson(response_ptr response, request_ptr request, query_args args) {
 	Json::Value res(Json::objectValue);
 	Json::StreamWriterBuilder wbuilder;
 	Json::Value obj(Json::objectValue);

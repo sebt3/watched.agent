@@ -697,6 +697,14 @@ void	service::getJsonStatus(Json::Value* ref) {
 	(*ref)["properties"]["uniqName"] = uniqName;
 }
 
+void	service::getJsonCollectorHistory(Json::Value* ref, double since) {
+	Json::Value obj(Json::objectValue);
+	for(std::map< std::string, std::shared_ptr<Collector> >::iterator i=collectors.begin();i!=collectors.end();i++) {
+		(*ref)[i->first] = obj;
+		i->second->getJsonHistory(&((*ref)[i->first]), since);
+	}
+}
+
 void	service::getIndexHtml(std::stringstream& stream ) {
 	int ok=0;
 	int failed=0;

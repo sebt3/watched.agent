@@ -104,7 +104,8 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 				::ERR_error_string_n(ec.value(), buf, sizeof(buf));
 				err += buf;
 			}
-			logNotice("HttpServer::httpsOnError", err);
+			if (!( err=="Operation aborted." && req->path== "" && req->http_version == "" ))
+				logNotice("HttpServer::httpsOnError", err+" for (R)"+req->remote_endpoint_address+" -> "+req->method+"("+req->http_version+"):"+req->path);
 		};
 
 		https->default_resource["GET"]=[this](std::shared_ptr<SWHttpsServer::Response> response, std::shared_ptr<SWHttpsServer::Request> request) {
@@ -158,8 +159,8 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 		http->config.address  = (*cfg)["host"].asString();
 		http->on_error = [this](request_ptr_h req, const std::error_code& ec)  {
 			std::string err = ec.message();
-			if (err!="Operation canceled")
-				logNotice("HttpServer::httpOnError", err);
+			if (!( err=="Operation aborted." && req->path== "" && req->http_version == "" ))
+				logNotice("HttpServer::httpOnError", err+" for (R)"+req->remote_endpoint_address+" -> "+req->method+"("+req->http_version+"):"+req->path);
 		};
 
 		http->default_resource["GET"]=[this](std::shared_ptr<SWHttpServer::Response> response, std::shared_ptr<SWHttpServer::Request> request) {
@@ -210,14 +211,14 @@ HttpServer::HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg) : cfg(p_cfg) {
 		};
 	}
 }
-void HttpServer::setRegex(std::string p_opt, std::string p_regex, std::function<void(response_ptr, request_ptr)> p_fnct) {
+void HttpServer::setRegex(std::string p_opt, std::string p_regex, std::function<void(response_ptr, request_ptr, query_args)> p_fnct) {
 	if (useSSL && https != nullptr) {
 		https->resource[p_regex][p_opt] = [p_fnct](response_ptr_s response, request_ptr_s request) {
 			response_ptr resp	= std::make_shared<std::stringstream>();
 			request_ptr args	= std::make_shared<std::vector<std::string>>();
 			for(unsigned int i=1;i<=request->path_match.size();i++)
 				args->push_back(request->path_match[i]);
-			p_fnct(resp, args );
+			p_fnct(resp, args, request->parse_query_string());
 			*response << resp->str();
 		};
 	} else if (http != nullptr) {
@@ -226,19 +227,19 @@ void HttpServer::setRegex(std::string p_opt, std::string p_regex, std::function<
 			request_ptr args	= std::make_shared<std::vector<std::string>>();
 			for(unsigned int i=1;i<=request->path_match.size();i++)
 				args->push_back(request->path_match[i]);
-			p_fnct(resp, args );
+			p_fnct(resp, args, request->parse_query_string());
 			*response << resp->str();
 		};
 	}
 }
-void HttpServer::setDefault(std::string p_opt, std::function<void(response_ptr, request_ptr)> p_fnct) {
+void HttpServer::setDefault(std::string p_opt, std::function<void(response_ptr, request_ptr, query_args)> p_fnct) {
 	if (useSSL && https != nullptr) {
 		https->default_resource[p_opt] = [p_fnct](response_ptr_s response, request_ptr_s request) {
 			response_ptr resp	= std::make_shared<std::stringstream>();
 			request_ptr args	= std::make_shared<std::vector<std::string>>();
 			for(unsigned int i=1;i<=request->path_match.size();i++)
 				args->push_back(request->path_match[i]);
-			p_fnct(resp, args );
+			p_fnct(resp, args, request->parse_query_string());
 			*response << resp->str();
 		};
 	} else if (http != nullptr) {
@@ -247,7 +248,7 @@ void HttpServer::setDefault(std::string p_opt, std::function<void(response_ptr, 
 			request_ptr args	= std::make_shared<std::vector<std::string>>();
 			for(unsigned int i=1;i<=request->path_match.size();i++)
 				args->push_back(request->path_match[i]);
-			p_fnct(resp, args );
+			p_fnct(resp, args, request->parse_query_string());
 			*response << resp->str();
 		};
 	}

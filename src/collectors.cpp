@@ -62,6 +62,13 @@ std::string  Ressource::getHistory(double since) {
 	return ss.str();
 }
 
+void Ressource::getHistory(Json::Value* out, double since) {
+	if (v.size()>=1) for(int i=v.size()-1;i>=0;i--) {
+		if (v[i].isMember("timestamp") && v[i]["timestamp"].asDouble() >= since)
+			out->append(v[i]);
+	}
+}
+
 std::string  Ressource::getMorrisDesc() {
 	std::string keys = "ykeys: [";
 	std::string desc = "labels: [";
@@ -159,7 +166,7 @@ void Collector::startThread() {
 					std::unique_lock<std::mutex> locker(lock);
 					if (active) {// if we've been locked by the destructor...
 						collect();
-						server->logInfo("Collector::thread", basePath+name+" updated");
+						server->logDebug("Collector::thread", basePath+name+" updated");
 					}
 				} catch(std::exception &e) {
 					server->logWarning("Collector::thread", basePath+name+" failed  to collect: "+e.what());
@@ -241,7 +248,7 @@ void Collector::getPaths(Json::Value* p_defs) {
 	}
 }
 
-void Collector::doGetGraph(response_ptr response, request_ptr request) {
+void Collector::doGetGraph(response_ptr response, request_ptr request, query_args args) {
 	std::string id  = (*request)[0];
 	std::string sub	= "";
 
@@ -263,16 +270,21 @@ void Collector::doGetGraph(response_ptr response, request_ptr request) {
         setResponseHtml(response, stream.str());
 }
 
-void Collector::doGetHistory(response_ptr response, request_ptr request) {
+void Collector::getJsonHistory(Json::Value* p_out, double since) {
+	Json::Value arr(Json::arrayValue);
+	for(std::map<std::string, std::shared_ptr<Ressource> >::const_iterator i = ressources.begin();i!=ressources.end();i++) {
+		(*p_out)[i->first] = arr;
+		i->second->getHistory(&((*p_out)[i->first]), since);
+	}
+}
+
+
+void Collector::doGetHistory(response_ptr response, request_ptr request, query_args args) {
 	std::string name   = (*request)[0];
 	double since  = -1;
-	if (request->size()>1) {
-		try {
-			since=stod((*request)[1]);
-		} catch (std::exception &e) { }
-	}
-        /*if (request.query().has("since"))
-		since= stod(request.query().get("since").get());*/
+	for(auto &pair: args)
+		if (pair.first == "since")
+			since=stod(pair.second);
 
 	std::map<std::string, std::shared_ptr<Ressource> >::const_iterator it = ressources.find(name);
 	if( it == ressources.end()) {
@@ -372,6 +384,13 @@ void CollectorsManager::getJson(Json::Value* p_defs) {
 	}
 }
 
+void CollectorsManager::getSystemJson(Json::Value* ref, double since) {
+	Json::Value obj(Json::objectValue);
+	for(std::map<std::string, std::shared_ptr<Collector> >::iterator i = collectors.begin();i != collectors.end();i++) {
+		(*ref)[i->first] = obj;
+		i->second->getJsonHistory(&((*ref)[i->first]),since);
+	}
+}
 
 CollectorsManager::CollectorsManager(std::shared_ptr<HttpServer> p_server, std::shared_ptr<Config> p_cfg) : server(p_server), cfg(p_cfg) {
 	Json::Value*	servCfg = cfg->getPlugins();

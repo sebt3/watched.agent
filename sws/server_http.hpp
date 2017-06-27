@@ -1,110 +1,44 @@
 #ifndef SERVER_HTTP_HPP
 #define	SERVER_HTTP_HPP
 
-#include <asio.hpp>
-#include <system_error>
-#include <chrono>
-#include <type_traits>
+#include "utility.hpp"
 #include <map>
-#include <unordered_map>
 #include <thread>
 #include <functional>
 #include <iostream>
 #include <sstream>
 
-#ifndef CASE_INSENSITIVE_EQUALS_AND_HASH
-#define CASE_INSENSITIVE_EQUALS_AND_HASH
-class case_insensitive_equals {
-public:
-    bool operator()(const std::string& Left, const std::string& Right) const
-    {
-        return Left.size() == Right.size() 
-             && std::equal ( Left.begin() , Left.end() , Right.begin() ,
-            []( char a , char b )
-        {
-            return tolower(a) == tolower(b); 
-        }
-        );
-    }};
-class case_insensitive_hash {
-public:
-    size_t operator()(const std::string& Keyval) const
-    {
-        //You might need a better hash function than this
-        size_t h = 0;
-        std::for_each( Keyval.begin() , Keyval.end() , [&](char c )
-        {
-            h += tolower(c);
-        });
-        return h;
-    }
-};
-#endif
-
-#include <regex>
-#define REGEX_NS std
-
-#ifndef DEPRECATED
-#ifdef __GNUC__
-#define DEPRECATED __attribute__((deprecated))
-#elif defined(_MSC_VER)
-#define DEPRECATED __declspec(deprecated)
+#ifdef USE_STANDALONE_ASIO
+#include <asio.hpp>
+namespace SimpleWeb {
+    using error_code = std::error_code;
+    using errc = std::errc;
+    namespace make_error_code = std;
+}
 #else
-#define DEPRECATED
+#include <boost/asio.hpp>
+namespace SimpleWeb {
+    namespace asio = boost::asio;
+    using error_code = boost::system::error_code;
+    namespace errc = boost::system::errc;
+    namespace make_error_code = boost::system::errc;
+}
 #endif
+
+// Late 2017 TODO: remove the following checks and always use std::regex
+#ifdef USE_BOOST_REGEX
+#include <boost/regex.hpp>
+namespace SimpleWeb {
+    namespace regex = boost;
+}
+#else
+#include <regex>
+namespace SimpleWeb {
+    namespace regex = std;
+}
 #endif
 
 namespace SimpleWeb {
-#ifndef DEADLINE_TIMER
-#define DEADLINE_TIMER
-typedef struct {
-	int64_t ticks() const {
-		return v.count();
-	}
-	int64_t total_milliseconds() const {
-		return std::chrono::duration_cast<std::chrono::milliseconds>(v).count();
-	}
-	int64_t total_microseconds() const {
-		return v.count();
-	}
-	std::chrono::microseconds v;
-} posix_duration;
-
-	
-template<typename Clock>
-struct CXX11Traits
-{
-  typedef typename Clock::time_point time_type;
-  typedef typename Clock::duration   duration_type;
-  static time_type now()
-  {
-      return Clock::now();
-  }
-  static time_type add(time_type t, duration_type d)
-  {
-      return t + d;
-  }
-  static duration_type subtract(time_type t1, time_type t2)
-  {
-      return t1 - t2;
-  }
-  static bool less_than(time_type t1, time_type t2)
-  {
-      return t1 < t2;
-  }
-  static  posix_duration 
-  to_posix_duration(duration_type d1)
-  {
-	  posix_duration ret;
-	  ret.v = std::chrono::duration_cast<std::chrono::microseconds>(d1);
-    return ret;
-  }
-};
-typedef asio::basic_deadline_timer< 
-        std::chrono::system_clock,  
-        CXX11Traits<std::chrono::system_clock>> deadline_timer;
-#endif
-
     template <class socket_type>
     class Server;
     
@@ -122,9 +56,66 @@ typedef asio::basic_deadline_timer<
 
             Response(const std::shared_ptr<socket_type> &socket): std::ostream(&streambuf), socket(socket) {}
 
+            template<class size_type>
+            void write_header(const CaseInsensitiveMultimap &header, size_type size=0) {
+                bool content_length_written=false;
+                for(auto &header_field: header) {
+                    if(size && !content_length_written && case_insensitive_equal(header_field.first, "content-length"))
+                       content_length_written=true;
+                    *this << header_field.first << ": " << header_field.second << "\r\n";
+                }
+                if(size && !content_length_written)
+                    *this << "Content-Length: " << size << "\r\n\r\n";
+                else
+                    *this << "\r\n";
+            }
         public:
             size_t size() {
                 return streambuf.size();
+            }
+            
+            void write(const char_type *ptr, std::streamsize n) {
+                std::ostream::write(ptr, n);
+            }
+            
+            /// Convenience function for writing status line, potential header fields, and empty content
+            void write(StatusCode status_code=StatusCode::success_ok, const CaseInsensitiveMultimap &header=CaseInsensitiveMultimap()) {
+                *this << "HTTP/1.1 " << SimpleWeb::status_code(status_code) << "\r\n";
+                write_header(header, 0);
+            }
+            
+            /// Convenience function for writing status line, header fields, and content
+            void write(StatusCode status_code, const std::string &content, const CaseInsensitiveMultimap &header=CaseInsensitiveMultimap()) {
+                *this << "HTTP/1.1 " << SimpleWeb::status_code(status_code) << "\r\n";
+                write_header(header, content.size());
+                if(!content.empty())
+                    *this << content;
+            }
+            
+            /// Convenience function for writing status line, header fields, and content
+            void write(StatusCode status_code, std::istream &content, const CaseInsensitiveMultimap &header=CaseInsensitiveMultimap()) {
+                *this << "HTTP/1.1 " << SimpleWeb::status_code(status_code) << "\r\n";
+                content.seekg(0, std::ios::end);
+                auto size=content.tellg();
+                content.seekg(0, std::ios::beg);
+                write_header(header, size);
+                if(size)
+                    *this << content.rdbuf();
+            }
+            
+            /// Convenience function for writing success status line, header fields, and content
+            void write(const std::string &content, const CaseInsensitiveMultimap &header=CaseInsensitiveMultimap()) {
+                write(StatusCode::success_ok, content, header);
+            }
+            
+            /// Convenience function for writing success status line, header fields, and content
+            void write(std::istream &content, const CaseInsensitiveMultimap &header=CaseInsensitiveMultimap()) {
+                write(StatusCode::success_ok, content, header);
+            }
+            
+            /// Convenience function for writing success status line, and header fields
+            void write(const CaseInsensitiveMultimap &header=CaseInsensitiveMultimap()) {
+                write(StatusCode::success_ok, std::string(), header);
             }
 
             /// If true, force server to close the connection after the response have been sent.
@@ -140,6 +131,7 @@ typedef asio::basic_deadline_timer<
             size_t size() {
                 return streambuf.size();
             }
+            /// Convenience function to return std::string. Note that the stream buffer is emptied when this functions is used.
             std::string string() {
                 std::stringstream ss;
                 ss << rdbuf();
@@ -158,13 +150,22 @@ typedef asio::basic_deadline_timer<
 
             Content content;
 
-            std::unordered_multimap<std::string, std::string, case_insensitive_hash, case_insensitive_equals> header;
+            CaseInsensitiveMultimap header;
 
-            REGEX_NS::smatch path_match;
+            regex::smatch path_match;
             
             std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
             
+            /// Returns query keys with percent-decoded values.
+            CaseInsensitiveMultimap parse_query_string() {
+                auto pos = path.find('?');
+                if (pos != std::string::npos && pos + 1 < path.size())
+                    return SimpleWeb::parse_query_string(path.substr(pos + 1));
+                else
+                    return CaseInsensitiveMultimap();
+            }
+
         private:
             Request(const socket_type &socket): content(streambuf) {
                 try {
@@ -200,11 +201,11 @@ typedef asio::basic_deadline_timer<
         Config config;
         
     private:
-        class regex_orderable : public REGEX_NS::regex {
+        class regex_orderable : public regex::regex {
             std::string str;
         public:
-            regex_orderable(const char *regex_cstr) : REGEX_NS::regex(regex_cstr), str(regex_cstr) {}
-            regex_orderable(const std::string &regex_str) : REGEX_NS::regex(regex_str), str(regex_str) {}
+            regex_orderable(const char *regex_cstr) : regex::regex(regex_cstr), str(regex_cstr) {}
+            regex_orderable(const std::string &regex_str) : regex::regex(regex_str), str(regex_str) {}
             bool operator<(const regex_orderable &rhs) const {
                 return str<rhs.str;
             }
@@ -217,7 +218,7 @@ typedef asio::basic_deadline_timer<
         std::map<std::string,
             std::function<void(std::shared_ptr<typename ServerBase<socket_type>::Response>, std::shared_ptr<typename ServerBase<socket_type>::Request>)> > default_resource;
         
-        std::function<void(std::shared_ptr<typename ServerBase<socket_type>::Request>, const std::error_code&)> on_error;
+        std::function<void(std::shared_ptr<typename ServerBase<socket_type>::Request>, const error_code&)> on_error;
         
         std::function<void(std::shared_ptr<socket_type> socket, std::shared_ptr<typename ServerBase<socket_type>::Request>)> on_upgrade;
         
@@ -268,8 +269,8 @@ typedef asio::basic_deadline_timer<
         }
         
         ///Use this function if you need to recursively send parts of a longer message
-        void send(const std::shared_ptr<Response> &response, const std::function<void(const std::error_code&)>& callback=nullptr) const {
-            asio::async_write(*response->socket, response->streambuf, [this, response, callback](const std::error_code& ec, size_t /*bytes_transferred*/) {
+        void send(const std::shared_ptr<Response> &response, const std::function<void(const error_code&)>& callback=nullptr) const {
+            asio::async_write(*response->socket, response->streambuf, [this, response, callback](const error_code& ec, size_t /*bytes_transferred*/) {
                 if(callback)
                     callback(ec);
             });
@@ -286,15 +287,15 @@ typedef asio::basic_deadline_timer<
         
         virtual void accept()=0;
         
-        std::shared_ptr<deadline_timer> get_timeout_timer(const std::shared_ptr<socket_type> &socket, long seconds) {
+        std::shared_ptr<asio::deadline_timer> get_timeout_timer(const std::shared_ptr<socket_type> &socket, long seconds) {
             if(seconds==0)
                 return nullptr;
             
-            auto timer=std::make_shared<deadline_timer>(*io_service);
-            timer->expires_from_now(std::chrono::seconds(seconds));
-            timer->async_wait([socket](const std::error_code& ec){
+            auto timer=std::make_shared<asio::deadline_timer>(*io_service);
+            timer->expires_from_now(boost::posix_time::seconds(seconds));
+            timer->async_wait([socket](const error_code& ec){
                 if(!ec) {
-                    std::error_code ec;
+                    error_code ec;
                     socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
                     socket->lowest_layer().close();
                 }
@@ -311,7 +312,7 @@ typedef asio::basic_deadline_timer<
             auto timer=this->get_timeout_timer(socket, config.timeout_request);
                         
             asio::async_read_until(*socket, request->streambuf, "\r\n\r\n",
-                    [this, socket, request, timer](const std::error_code& ec, size_t bytes_transferred) {
+                    [this, socket, request, timer](const error_code& ec, size_t bytes_transferred) {
                 if(timer)
                     timer->cancel();
                 if(!ec) {
@@ -333,7 +334,7 @@ typedef asio::basic_deadline_timer<
                         }
                         catch(const std::exception &e) {
                             if(on_error)
-                                on_error(request, std::make_error_code(std::errc::protocol_error));
+                                on_error(request, make_error_code::make_error_code(errc::protocol_error));
                             return;
                         }
                         if(content_length>num_additional_bytes) {
@@ -342,7 +343,7 @@ typedef asio::basic_deadline_timer<
                             asio::async_read(*socket, request->streambuf,
                                     asio::transfer_exactly(content_length-num_additional_bytes),
                                     [this, socket, request, timer]
-                                    (const std::error_code& ec, size_t /*bytes_transferred*/) {
+                                    (const error_code& ec, size_t /*bytes_transferred*/) {
                                 if(timer)
                                     timer->cancel();
                                 if(!ec)
@@ -416,8 +417,8 @@ typedef asio::basic_deadline_timer<
             for(auto &regex_method: resource) {
                 auto it=regex_method.second.find(request->method);
                 if(it!=regex_method.second.end()) {
-                    REGEX_NS::smatch sm_res;
-                    if(REGEX_NS::regex_match(request->path, sm_res, regex_method.first)) {
+                    regex::smatch sm_res;
+                    if(regex::regex_match(request->path, sm_res, regex_method.first)) {
                         request->path_match=std::move(sm_res);
                         write_response(socket, request, it->second);
                         return;
@@ -429,14 +430,7 @@ typedef asio::basic_deadline_timer<
                 write_response(socket, request, it->second);
             }
         }
-	static bool Insensitive(const std::string& Left, const std::string& Right)
-	{
-		return Left.size() == Right.size() 
-			&& std::equal ( Left.begin() , Left.end() , Right.begin() , []( char a , char b ) {
-				return tolower(a) == tolower(b); 
-		});
-	}
-
+        
         void write_response(const std::shared_ptr<socket_type> &socket, const std::shared_ptr<Request> &request, 
                 std::function<void(std::shared_ptr<typename ServerBase<socket_type>::Response>,
                                    std::shared_ptr<typename ServerBase<socket_type>::Request>)>& resource_function) {
@@ -445,7 +439,7 @@ typedef asio::basic_deadline_timer<
 
             auto response=std::shared_ptr<Response>(new Response(socket), [this, request, timer](Response *response_ptr) {
                 auto response=std::shared_ptr<Response>(response_ptr);
-                this->send(response, [this, response, request, timer](const std::error_code& ec) {
+                this->send(response, [this, response, request, timer](const error_code& ec) {
                     if(timer)
                         timer->cancel();
                     if(!ec) {
@@ -454,8 +448,12 @@ typedef asio::basic_deadline_timer<
 
                         auto range=request->header.equal_range("Connection");
                         for(auto it=range.first;it!=range.second;it++) {
-                            if(Insensitive(it->second, "close"))
+                            if(case_insensitive_equal(it->second, "close")) {
                                 return;
+                            } else if (case_insensitive_equal(it->second, "keep-alive")) {
+                                this->read_request_and_content(response->socket);
+                                return;
+                            }
                         }
                         if(request->http_version >= "1.1")
                             this->read_request_and_content(response->socket);
@@ -470,7 +468,7 @@ typedef asio::basic_deadline_timer<
             }
             catch(const std::exception &e) {
                 if(on_error)
-                    on_error(request, std::make_error_code(std::errc::operation_canceled));
+                    on_error(request, make_error_code::make_error_code(errc::operation_canceled));
                 return;
             }
         }
@@ -500,7 +498,7 @@ typedef asio::basic_deadline_timer<
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
             auto socket=std::make_shared<HTTP>(*io_service);
                         
-            acceptor->async_accept(*socket, [this, socket](const std::error_code& ec){
+            acceptor->async_accept(*socket, [this, socket](const error_code& ec){
                 //Immediately start accepting a new connection (if io_service hasn't been stopped)
                 if (ec != asio::error::operation_aborted)
                     accept();

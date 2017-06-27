@@ -12,6 +12,7 @@
 namespace watcheD {
 typedef std::shared_ptr<std::stringstream> response_ptr;
 typedef std::shared_ptr<std::vector<std::string>> request_ptr;
+typedef SimpleWeb::CaseInsensitiveMultimap query_args;
 
 /*********************************
  * Server
@@ -22,8 +23,8 @@ class log;
 class HttpServer {
 public:
 	HttpServer(Json::Value* p_cfg, Json::Value* p_logcfg);
-	void setRegex(std::string p_opt, std::string p_regex, std::function<void(response_ptr, request_ptr)> p_fnct);
-	void setDefault(std::string p_opt, std::function<void(response_ptr, request_ptr)> p_fnct);
+	void setRegex(std::string p_opt, std::string p_regex, std::function<void(response_ptr, request_ptr,query_args)> p_fnct);
+	void setDefault(std::string p_opt, std::function<void(response_ptr, request_ptr,query_args)> p_fnct);
 	void start();
 	std::string getHead(std::string p_title, std::string p_sub="");
 	std::string getFoot(std::string p_script);
@@ -53,6 +54,7 @@ public:
 	Json::Value* getValue(std::string p_name) { return &(v[0][p_name]); }
 	std::string  getHistory(double since);
 	std::string  getMorrisDesc();
+	void getHistory(Json::Value* out, double since);
 	void getDefinition(Json::Value* p_defs);
 	std::string  typeName;
 protected:
@@ -119,13 +121,14 @@ public:
 	
 	virtual void collect() =0;
 
-	void doGetHistory(response_ptr response, request_ptr request);
-	void doGetGraph(response_ptr response, request_ptr request);
+	void doGetHistory(response_ptr response, request_ptr request, query_args args);
+	void doGetGraph(response_ptr response, request_ptr request, query_args args);
 	void getDefinitions(Json::Value* p_defs);
 	void getPaths(Json::Value* p_defs);
 	void setService(std::shared_ptr<service> p_serv);
 	std::string getHost();
 	void getIndexHtml(std::stringstream& stream );
+	void getJsonHistory(Json::Value* p_out, double since);
 protected:
 	void addGetMetricRoute();
 	void addRessource(std::string p_name, std::string p_desc, std::string p_typeName);
@@ -155,7 +158,7 @@ extern std::map<std::string, collector_maker_t* > collectorFactory;
 }
 
 #define associate(s,type,regex,method)				\
-server->setRegex(type,regex,[this](response_ptr response, request_ptr request) { this->method(response, request); });
+server->setRegex(type,regex,[this](response_ptr response, request_ptr request, query_args args) { this->method(response, request, args); });
 #define MAKE_PLUGIN_COLLECTOR(className,id)			\
 extern "C" {									\
 std::shared_ptr<Collector> maker_##id(std::shared_ptr<HttpServer> p_srv, Json::Value* p_cfg){	\
