@@ -350,6 +350,7 @@ void	servicesManager::doGetServiceLog(response_ptr response, request_ptr request
 
 void	servicesManager::doGetAllJson(response_ptr response, request_ptr request, query_args args) {
 	double since  = -1;
+	std::chrono::duration<double, std::milli> fp_ms = std::chrono::system_clock::now().time_since_epoch();
 	for(auto &pair: args)
 		if (pair.first == "since")
 			since=stod(pair.second);
@@ -359,6 +360,7 @@ void	servicesManager::doGetAllJson(response_ptr response, request_ptr request, q
 	server->logInfo("servicesManager::doGetAllJson", "Getting services");
 	res["services"] = obj;
 	res["system"] = obj;
+	res["timestamp"] = fp_ms.count();
 	for (std::vector< std::shared_ptr<service> >::iterator i=services.begin();i!=services.end();i++) {
 		res["services"][(*i)->getID()] = obj;
 		res["services"][(*i)->getID()]["status"] = obj;
