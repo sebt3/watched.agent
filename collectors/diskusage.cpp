@@ -48,8 +48,8 @@ public:
 	}
 	void setStats(struct statvfs *p_stats) {
 		nextValue();
-		setProperty("size", p_stats->f_bsize*p_stats->f_blocks/(1024*1024));
-		setProperty("free", p_stats->f_bsize*p_stats->f_bavail/(1024*1024));
+		setProperty("size", (double)(p_stats->f_bsize*p_stats->f_blocks)/(1024*1024));
+		setProperty("free", (double)(p_stats->f_bsize*p_stats->f_bavail)/(1024*1024));
 		setProperty("pctfree", (double)(p_stats->f_bavail*100)/p_stats->f_blocks);
 		setProperty("ipctfree", (double)(p_stats->f_favail*100)/p_stats->f_files);
 	}

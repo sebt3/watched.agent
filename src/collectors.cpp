@@ -30,6 +30,12 @@ Ressource::~Ressource(){
 	globalCounters["ressource"].del++;
 }
 
+static Json::Value static_zero = 0;
+Json::Value* Ressource::getValue(std::string p_name) {
+	if (v.empty()) return &static_zero;
+	return &(v[0][p_name]);
+}
+
 void Ressource::nextValue() {
 	Json::Value data(Json::objectValue);
 	std::chrono::duration<double, std::milli> fp_ms = std::chrono::system_clock::now().time_since_epoch();

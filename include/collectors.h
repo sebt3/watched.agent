@@ -51,7 +51,7 @@ public:
 	bool haveProperty(std::string p_name) { return v[0].isMember(p_name); }
 	void setProperty(std::string p_name, Json::Value p_val) { v[0][p_name] = p_val;}
 	void addProperty(std::string p_name, std::string p_desc, std::string p_typename) { d[p_name] = p_desc;t[p_name] = p_typename;}
-	Json::Value* getValue(std::string p_name) { return &(v[0][p_name]); }
+	Json::Value* getValue(std::string p_name);
 	std::string  getHistory(double since);
 	std::string  getMorrisDesc();
 	void getHistory(Json::Value* out, double since);
